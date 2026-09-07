@@ -1,0 +1,48 @@
+PowerTrain Optimizer — how to run & share on a network
+======================================================
+
+1) ZERO DEPENDENCY (give this EXE to anyone)
+--------------------------------------------
+- Copy ONLY:  PowerTrainOptimizer.exe
+- Double-click on any Windows 10/11 laptop.
+- No Python, Node, or database install is required.
+- The first run may take 20–60 seconds while Windows extracts the app.
+- Your browser opens automatically to the local address
+  (usually http://127.0.0.1:8765/).
+
+Project data is stored on that laptop under:
+  %LOCALAPPDATA%\PowerTrainOptimizer\
+
+
+2) SHARE ON THE OFFICE / Wi‑Fi NETWORK
+--------------------------------------
+Host laptop (runs the EXE):
+  1. Start PowerTrainOptimizer.exe and leave it running.
+  2. Open Settings in the app — you will see Network URLs like:
+       http://192.168.x.x:8765/
+     Or open ACCESS_URLS.txt next to the EXE / in LocalAppData.
+  3. If Windows Firewall asks, choose Allow on Private networks.
+  4. Do NOT click Quit App until everyone is finished.
+
+Other people on the same network:
+  1. Open Chrome / Edge / any browser.
+  2. Type the Network URL from the host (example):
+       http://192.168.1.45:8765/
+  3. No install needed — browser only.
+
+Notes:
+- All users share the same projects/database on the HOST laptop.
+- Host and guests must be on the same Wi‑Fi / LAN (not guest Wi‑Fi isolation).
+- VPN or corporate firewall may block access; ask IT if needed.
+- Local-only mode (no network): set environment variable
+    PTO_HOST=127.0.0.1
+  before starting the EXE.
+
+
+3) STOP THE APP
+---------------
+Click Quit App in the left sidebar on the host.
+That stops the server for everyone.
+
+
+Avaada PowerTrain Optimizer
