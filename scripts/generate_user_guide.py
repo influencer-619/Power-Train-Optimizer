@@ -130,7 +130,8 @@ def build():
         f"Model Version {MODEL_VERSION}\n"
         "Techno-Economic 8,760-Hour Power Architecture Tool\n"
         "for Data Centre · Solar · Wind · BESS · Grid\n"
-        "Includes: portable EXE · LAN sharing · compact Indian number format · on-screen parameter help"
+        "Includes: portable EXE · LAN sharing · Save Project (.pto.zip) · architecture asset selection · "
+        "compact Indian number format · on-screen parameter help"
     )
     set_run_font(r, size=11)
     add_para(doc, "")
@@ -154,11 +155,11 @@ def build():
             "Start screen — every option",
             "Main application layout & banners",
             "Left navigation — every menu explained",
-            "Project Setup wizard (all 11 steps)",
+            "Project Setup wizard (asset-aware steps)",
             "Parameter reference & on-screen help text",
             "Understanding source tags & data quality",
-            "Commercial architectures & recommendation rules",
-            "Compliance (RPO / RCO / ESO / RE / CFE analytics)",
+            "Commercial architectures, selectable assets & recommendation rules",
+            "Compliance (RPO / RCO / ESO / RE / CFE) — edited in Project Setup",
             "Profiles — optional PROJECT DATA CSV import",
             "Running the 8,760-hour simulation, charts & Energy Ledger",
             "How numbers are displayed (Thousand / Lakh / Cr)",
@@ -303,6 +304,41 @@ def build():
                 "package_share.bat builds dist\\PowerTrain_Share\\ for USB/email distribution.",
             ],
             [
+                "Chrome launch",
+                "Opens in your existing Google Chrome as a normal tab (falls back to Edge / system browser). "
+                "Override with PTO_BROWSER=edge|default if needed.",
+            ],
+            [
+                "Quit / close stops background",
+                "Quit App stops the server immediately (and clears orphaned EXE copies). Closing the browser tab "
+                "also stops the background process within a few seconds. A second EXE launch reuses a live instance "
+                "instead of stacking servers.",
+            ],
+            [
+                "Create / Open / Save Project",
+                "Start screen: Create New Project (full defaults) or Open Existing Project… (.pto.zip from disk). "
+                "Top bar Save Project writes inputs and a portable .pto.zip to a folder you choose.",
+            ],
+            [
+                "Architecture asset selection",
+                "DISCOM: DISCOM/grid only. CAPTIVE: Solar / Wind / BESS. HYBRID & OPEN_ACCESS: DISCOM + Solar + "
+                "Wind + BESS. Unselected assets are zeroed in simulation; Project Setup tabs follow the selection.",
+            ],
+            [
+                "Network charges per asset",
+                "Optional ₹/kWh transmission / wheeling / other (and banking where applicable) applied separately "
+                "to Solar, Wind, BESS discharge and DISCOM/grid import when each asset’s network flag is on.",
+            ],
+            [
+                "Additional costs",
+                "Project Setup → Financial: editable list of extra annual costs included in ₹/kWh and cashflows.",
+            ],
+            [
+                "Compliance location",
+                "Compliance targets and applicability are edited under Project Setup → Compliance (not a separate "
+                "Analysis nav item). Dashboard links back to that setup step.",
+            ],
+            [
                 "On-screen parameter help",
                 "Every editable field shows a plain-language title plus a short explanation under the label "
                 "(from the model description), not only a cryptic snake_case name.",
@@ -356,8 +392,10 @@ def build():
             "Double-click PowerTrainOptimizer.exe (no console/CMD window appears).",
             "Wait a few seconds while the embedded server starts "
             "(first launch creates SQLite; later launches reuse existing data and start faster).",
-            "Your default browser opens automatically to http://127.0.0.1:<port>/ "
-            "(preferred port starts at 8765; if busy the launcher picks the next free port).",
+            "Google Chrome opens a new tab to http://127.0.0.1:<port>/ when Chrome is installed "
+            "(preferred port starts at 8765; if busy the launcher picks the next free port). "
+            "If Chrome is missing, Edge or the system default browser is used.",
+            "If an instance is already running, a second double-click reopens that UI instead of starting another server.",
             "The Start screen appears — PowerTrain Optimizer is ready.",
         ],
     )
@@ -402,10 +440,13 @@ def build():
         doc,
         [
             "All users share the same projects and database on the HOST laptop.",
-            "With LAN mode on, closing the browser on the host does NOT stop the server "
-            "(so remote users stay connected). Stop only via Quit App.",
+            "Quit App on the host stops the server for everyone immediately.",
+            "Closing the last host browser tab also stops the background EXE within a few seconds "
+            "(a short delay allows a page refresh to reconnect). While any UI tab is open and sending "
+            "heartbeats — including a guest on the Network URL — the server stays up.",
             "Guest Wi‑Fi with client isolation, VPN, or corporate firewalls may block access — ask IT if needed.",
             "Local-only mode (no network): set environment variable PTO_HOST=127.0.0.1 before starting the EXE.",
+            "Optional: PTO_BROWSER=chrome|edge|default controls which browser the host launcher opens.",
         ],
     )
     add_heading(doc, "3.4 Developer launch & rebuild", 2)
@@ -416,9 +457,10 @@ def build():
             "run_dev.bat — creates/uses .venv, installs requirements, starts the launcher (also LAN-capable).",
             "run_tests.bat — runs pytest unit tests.",
             "build_exe.bat — rebuilds dist\\PowerTrainOptimizer.exe with PyInstaller (windowed, no CMD) "
-            "and copies HOW_TO_SHARE.txt beside the EXE.",
+            "and copies HOW_TO_SHARE.txt beside the EXE. Quit any running EXE first or Windows will block overwrite.",
             "package_share.bat — builds the EXE then creates dist\\PowerTrain_Share\\ "
             "(EXE + HOW_TO_SHARE.txt) ready to give to anyone.",
+            "scripts\\generate_user_guide.py — regenerates docs\\PowerTrain_Optimizer_User_Guide.docx.",
         ],
     )
     add_heading(doc, "3.5 Closing the application", 2)
@@ -426,14 +468,15 @@ def build():
         doc,
         [
             "Preferred: click Quit App at the bottom of the left sidebar. Confirm the prompt "
-            "(it warns that network users will also disconnect). The UI then shows that the server stopped.",
-            "LAN / default bind: closing only the browser tab does NOT exit the EXE — use Quit App "
-            "so remote users are not left hanging mid-session without a host.",
-            "Local-only mode (PTO_HOST=127.0.0.1): closing the browser also stops the process via heartbeat "
-            "(typically within a few seconds), same as earlier releases.",
+            "(it warns that the server and background PowerTrain processes will stop). "
+            "The UI then shows that the server stopped — close the Chrome tab yourself.",
+            "Closing the browser tab / window also stops the background EXE (within a few seconds). "
+            "Refresh within that window cancels the stop so you do not lose the session by accident.",
+            "If no UI heartbeats arrive for ~45 seconds, the process exits as a safety net.",
+            "Quit App also terminates other orphaned PowerTrainOptimizer.exe copies from earlier runs.",
             "There is no separate CMD window to close for the packaged EXE (windowed build).",
             "Developer mode (run_dev.bat): the console window closes automatically when the server exits.",
-            "Project data remains in SQLite and is available on the next launch.",
+            "Project data remains in SQLite (and any .pto.zip you saved) and is available on the next launch.",
         ],
     )
 
@@ -442,17 +485,21 @@ def build():
     add_numbered(
         doc,
         [
-            "Launch the application (latest Model 2.0 EXE).",
-            "On the Start screen click Start with Default Model.",
-            "Confirm the project name is Default Data Centre - 250 MW.",
-            "Read the yellow banner: DEFAULT ASSUMPTIONS IN USE — replace with project data before investment decisions.",
+            "Launch the application (latest EXE) — Chrome opens the Start screen.",
+            "Click Create New Project (loads full default parameters for the demo 250 MW case).",
+            "Confirm the project opens and note the yellow DEFAULT ASSUMPTIONS banner.",
+            "Optional: click Save Project in the top bar and choose a local folder for the .pto.zip backup.",
             "Click Run 8760 Simulation in the top bar.",
             "On the Dashboard, first read Feasibility, Data Quality and CFE Pass Mode cards — then the KPI row.",
             "Check whether the architecture card says RECOMMENDED or NOT FEASIBLE / other status (demo often fails strict 90% CFE).",
             "Open Energy Ledger and confirm reconciliation status is OK.",
-            "Open Project Setup (and optionally Profiles) to replace defaults / import site profiles.",
-            "After any input change, re-run simulation if you see a STALE RESULTS banner.",
-            "Optionally run Optimization (with explainability), Architecture Comparison, Sensitivity, then export Excel/PDF from Reports.",
+            "Open Project Setup: pick Architecture assets, edit Load/Solar/Wind/BESS/Grid, Compliance and Financial "
+            "(including Additional costs). Setup tabs follow selected assets.",
+            "After any input change, click Save Project again if you want the .pto.zip updated, then re-run "
+            "simulation if you see a STALE RESULTS banner.",
+            "Optionally run Optimization, Architecture Comparison, Sensitivity, then export Excel/PDF from Reports "
+            "(or Backup Project .pto.zip).",
+            "When finished: Quit App (or close the Chrome tab) so the background EXE exits.",
         ],
     )
     doc.add_page_break()
@@ -461,21 +508,22 @@ def build():
     add_heading(doc, "5. Start Screen — Every Option", 1)
     add_para(
         doc,
-        "The Start screen is the first page. No project is loaded until you choose one of the three actions.",
+        "The Start screen is the first page. No project is loaded until you choose one of the two actions below. "
+        "(Earlier “Start with Default Model” and sidebar “Switch Project” controls have been removed.)",
     )
-    add_heading(doc, "5.1 Start with Default Model", 2)
+    add_heading(doc, "5.1 Create New Project", 2)
     add_para(
         doc,
-        "Opens the seeded demonstration project Default Data Centre - 250 MW. All inputs are pre-filled "
-        "so you can run a simulation immediately. Every pre-filled editable value is a DEFAULT ASSUMPTION "
-        "unless marked CONCEPT_NOTE.",
+        "Creates a new project from the full central default configuration (same sizing as the former "
+        "demonstration case). Use Project Setup to rename and replace defaults. Every pre-filled editable "
+        "value is a DEFAULT ASSUMPTION unless marked CONCEPT_NOTE.",
     )
-    add_para(doc, "Default demonstration sizing (editable):")
+    add_para(doc, "Default sizing seeded into a new project (editable):")
     add_table(
         doc,
         ["Item", "Default"],
         [
-            ["Project / facility name", "Default Data Centre - 250 MW"],
+            ["Typical seeded name / facility", "Default Data Centre - 250 MW (editable in Setup)"],
             ["IT / peak load", "250 MW"],
             ["Load factor", "80% (base ≈ 200 MW)"],
             ["Solar", "450 MW @ 22% CF"],
@@ -487,17 +535,17 @@ def build():
             ["Hourly CFE target", "90%"],
         ],
     )
-    add_heading(doc, "5.2 Create New Project", 2)
+    add_heading(doc, "5.2 Open Existing Project…", 2)
     add_para(
         doc,
-        "Creates a new project named New Data Centre Project, cloned from the same central default "
-        "configuration. Use this when you want a clean workspace separate from the demonstration project.",
+        "Opens a file picker for a local PowerTrain backup (.pto.zip or .zip). The archive is restored into "
+        "the running app’s database so you can continue editing and simulating. Use this after moving machines "
+        "or receiving a colleague’s saved project file.",
     )
-    add_heading(doc, "5.3 Open Existing Project", 2)
     add_para(
         doc,
-        "Lists all projects stored in SQLite. Click Open next to the project you want. Use this after "
-        "returning to the application or after Switch Project.",
+        "Tip: After Create New Project or any input edits, use Save Project in the top bar to write a fresh "
+        ".pto.zip to a folder you choose (Save As / download fallback if the browser blocks the folder picker).",
     )
 
     # 6 Layout
@@ -506,7 +554,7 @@ def build():
     add_para(
         doc,
         "Primary navigation to every analysis page (listed in Section 7). At the bottom of the sidebar: "
-        "Collapse (narrow/wide nav) and Quit App (shuts down the local server and exits the EXE).",
+        "Collapse (narrow/wide nav) and Quit App (shuts down the local server / background EXE).",
     )
     add_heading(doc, "6.2 Top bar", 2)
     add_bullets(
@@ -515,8 +563,10 @@ def build():
             "Project name and current page title",
             f"Model version chip (Model {MODEL_VERSION})",
             "Commercial structure pill (e.g. HYBRID Architecture)",
+            "Study year selector (01 Jan – 31 Dec of the chosen calendar year)",
             "Run 8760 Simulation button — always available once a project is open",
-            "Study year chip (01 Jan – 31 Dec)",
+            "Save Project — saves inputs and lets you store a .pto.zip on your local drive",
+            "Theme toggle (light / dark)",
         ],
     )
     add_heading(doc, "6.3 Banners (read these before trusting KPIs)", 2)
@@ -533,8 +583,6 @@ def build():
         ],
     )
     add_para(doc, APPLICABILITY_BANNER, italic=True, size=10)
-    add_heading(doc, "6.4 Session → Switch Project", 2)
-    add_para(doc, "Returns to the Start screen without deleting data. You can open another project.")
 
     doc.add_page_break()
 
@@ -551,14 +599,16 @@ def build():
             "hourly CFE heatmap (0–100% coral→amber→teal with target tick); cost and energy donuts; "
             "architecture status card (RECOMMENDED only if feasible — otherwise NOT FEASIBLE / other status; "
             "DISCOM shown as GRID-ONLY BASELINE); scenario comparison with feasibility-aware RECOMMENDED "
-            "label; compliance Pass/Fail with Why Fail?; recent runs. STALE RESULTS banner when inputs changed. "
+            "label; compliance Pass/Fail with Why Fail? and a link Open Project Setup → Compliance; recent runs. "
+            "STALE RESULTS banner when inputs changed. "
             "If no simulation has been run yet, prompts you to click Run 8760 Simulation.",
         ),
         (
             "Project Setup",
-            "Guided 11-step wizard covering every input section with a progress bar. Prefer this for first-time "
-            "configuration. Buttons: Back, Save Section, Next / Finish. Load/Solar/Wind steps include "
-            "profile_source (SYNTHETIC | PROJECT DATA).",
+            "Guided wizard covering General, Data Centre, Load, selected asset steps (Solar/Wind/BESS/Grid per "
+            "Architecture checkboxes), Commercial, Compliance, Financial (incl. Additional costs), and Optimization. "
+            "Progress bar and step chips follow the selected assets. Buttons: Back, Save Section, Next / Finish. "
+            "Load/Solar/Wind steps include profile_source (SYNTHETIC | PROJECT DATA).",
         ),
         (
             "Load",
@@ -586,18 +636,15 @@ def build():
         ),
         (
             "Grid",
-            "Direct editor for interconnection voltage, import limit, tariffs (incl. TOD), demand/fixed charges and network charges.",
+            "Direct editor for interconnection voltage, import limit, tariffs (incl. TOD), demand/fixed charges "
+            "and DISCOM/grid network charges (when the DISCOM asset and network flag are enabled).",
         ),
         (
             "Architecture",
-            "Select commercial structure tabs (DISCOM / CAPTIVE / HYBRID / OPEN_ACCESS), edit commercial parameters, "
-            "and run Architecture Comparison across all four structures. Comparison highlights RECOMMENDED only among "
-            "feasible architectures; DISCOM remains GRID-ONLY BASELINE and is never auto-recommended when RE/CFE targets miss.",
-        ),
-        (
-            "Compliance",
-            "Edit RPO/RCO/ESO/RE/CFE targets, applicability and CFE pass mode. After a simulation, shows detailed "
-            "compliance cards, RE/CFE pass-fail vs targets, and CFE analytics context (min/mean/% hours meeting target).",
+            "Select commercial structure (DISCOM / CAPTIVE / HYBRID / OPEN_ACCESS), tick which assets are in scope "
+            "(DISCOM-only for DISCOM; Solar/Wind/BESS for Captive; DISCOM+Solar+Wind+BESS for Hybrid/OA), "
+            "edit commercial parameters filtered by structure/assets, and run Architecture Comparison. "
+            "Comparison highlights RECOMMENDED only among feasible architectures; DISCOM remains GRID-ONLY BASELINE.",
         ),
         (
             "8760 Simulation",
@@ -636,7 +683,7 @@ def build():
         (
             "Reports",
             "Export Excel workbook (incl. Energy Ledger, Feasibility, Data Quality, CFE Analytics, incremental economics), "
-            "PDF executive report (feasibility + binding constraints + DISCOM baseline), or a project backup package.",
+            "PDF executive report (feasibility + binding constraints + DISCOM baseline), or Backup Project (.pto.zip).",
         ),
         (
             "Assumptions",
@@ -665,8 +712,10 @@ def build():
     add_heading(doc, "8. Project Setup Wizard — Step by Step", 1)
     add_para(
         doc,
-        "Open Project Setup. A progress bar and step chips show where you are. Always click Save Section "
-        "(or Next, which also saves) before leaving a step if you changed values.",
+        "Open Project Setup. A progress bar and step chips show where you are. The middle asset steps "
+        "(Solar / Wind / BESS / Grid) appear only when those assets are selected under Architecture. "
+        "Always click Save Section (or Next, which also saves) before leaving a step if you changed values. "
+        "Use top-bar Save Project when you want a portable .pto.zip on disk.",
     )
     steps = [
         ("1. General", "Project name, location label, currency, model hours (8760), calendar year, random seed, notes."),
@@ -677,19 +726,26 @@ def build():
             "month and hour multipliers. If PROJECT DATA, import the CSV under Profiles before simulating.",
         ),
         (
-            "4. Solar",
-            "profile_source, capacity, CF, sunrise/sunset/peak hour, variability, degradation, life, CAPEX/OPEX, energy cost, seasonal factors.",
+            "4–7. Asset steps (conditional)",
+            "Solar / Wind / BESS / Grid editors appear according to Architecture asset checkboxes. "
+            "DISCOM structure shows Grid (DISCOM) only; Captive shows Solar/Wind/BESS; Hybrid and Open Access can show all four.",
         ),
         (
-            "5. Wind",
-            "profile_source, capacity, CF, variability, degradation, life, CAPEX/OPEX, energy cost, monthly factors.",
+            "Commercial / Architecture",
+            "Structure selection, include_* asset flags, and structure-specific ownership/price/network flags "
+            "(network charge sections appear per selected asset when each apply_network_charges_to_* flag is True).",
         ),
-        ("6. BESS", "Power/energy, SOC window, efficiencies, charge/discharge limits, degradation, CAPEX/OPEX, replacement, grid-charge flag."),
-        ("7. Grid", "Voltage, max import, energy/TOD tariffs, demand/fixed/network charges, losses, availability, escalation."),
-        ("8. Commercial", "Structure selection and structure-specific ownership/price/network flags."),
-        ("9. Compliance", "RPO/RCO/ESO applicability and targets, RE and CFE targets and pass mode (drives feasibility)."),
-        ("10. Financial", "Project life, discount rate, inflation, escalations, residual value, optional financing flags."),
-        ("11. Optimization", "Objective, dispatch mode, search effort, capacity bounds, constraint toggles, balanced weights."),
+        (
+            "Compliance",
+            "RPO/RCO/ESO applicability and targets, Annual RE and Hourly CFE targets and pass mode (drives feasibility). "
+            "This is the only place to edit compliance inputs (removed from the Analysis nav).",
+        ),
+        (
+            "Financial",
+            "Project life, discount rate, inflation, escalations, residual value, optional financing flags, "
+            "and Additional costs (named annual ₹ line items included in Year-1 cost, ₹/kWh and cashflows).",
+        ),
+        ("Optimization", "Objective, dispatch mode, search effort, capacity bounds, constraint toggles, balanced weights."),
     ]
     for title, text in steps:
         add_heading(doc, title, 2)
@@ -863,14 +919,31 @@ def build():
     )
 
     # 11 Architectures
-    add_heading(doc, "11. Commercial Architectures & Recommendation Rules", 1)
+    add_heading(doc, "11. Commercial Architectures, Selectable Assets & Recommendation Rules", 1)
+    add_heading(doc, "11.0 Asset selection (include flags)", 2)
+    add_para(
+        doc,
+        "On Architecture / Commercial you choose which assets participate. Unselected assets are forced to "
+        "zero capacity in the engine and their Project Setup tabs are hidden.",
+    )
+    add_table(
+        doc,
+        ["Structure", "Selectable assets"],
+        [
+            ["DISCOM", "DISCOM / grid only"],
+            ["CAPTIVE", "Solar, Wind, BESS"],
+            ["HYBRID", "DISCOM, Solar, Wind, BESS"],
+            ["OPEN_ACCESS", "DISCOM, Solar, Wind, BESS"],
+        ],
+    )
     add_heading(doc, "11.1 DISCOM — GRID-ONLY BASELINE", 2)
     add_para(
         doc,
         "Data Centre → MSEDCL/DISCOM → Grid. RE and BESS capacities are treated as zero for the DISCOM "
         "energy path so the case represents full grid supply economics. "
         "Therefore Annual RE % and Hourly CFE min show 0% by design (not a calculation error). "
-        "Costs include energy (TOD if enabled), demand and fixed charges, plus any applicable compliance cost. "
+        "Costs include energy (TOD if enabled), demand and fixed charges, plus any applicable compliance cost "
+        "and DISCOM network charges when enabled. "
         "IRR and Payback typically show “—” for DISCOM because cashflows are all costs with no RE CAPEX "
         "investment to recover; NPV of DISCOM is the present value of grid electricity bills (often large and negative). "
         "On the Dashboard architecture card, DISCOM is labelled GRID-ONLY BASELINE — never RECOMMENDED when "
@@ -881,19 +954,19 @@ def build():
         doc,
         "Avaada RE project style captive structure into the Data Centre. Ownership % and allocation % are "
         "commercial inputs — the tool does not certify captive legal qualification. Energy may be priced via "
-        "captive_energy_price with optional network charges and losses.",
+        "captive_energy_price with optional per-asset network charges and losses on the selected Solar/Wind/BESS assets.",
     )
     add_heading(doc, "11.3 Hybrid (primary optimization architecture)", 2)
     add_para(
         doc,
-        "Solar + Wind + BESS + Grid serving the Data Centre. This is the default structure and the primary "
-        "architecture contemplated for least-cost optimization under RE/CFE constraints.",
+        "Selected combination of Solar + Wind + BESS + DISCOM/grid serving the Data Centre. This is the default "
+        "structure and the primary architecture contemplated for least-cost optimization under RE/CFE constraints.",
     )
     add_heading(doc, "11.4 Open Access", 2)
     add_para(
         doc,
-        "RE generators → OA / transmission network → Data Centre. Uses oa_energy_price plus configurable "
-        "transmission, wheeling, banking and other charges.",
+        "RE generators → OA / transmission network → Data Centre (with optional DISCOM backup). Uses oa_energy_price "
+        "plus configurable per-asset network charges when those flags are enabled.",
     )
     add_heading(doc, "11.5 Architecture Comparison & RECOMMENDED label", 2)
     add_para(
@@ -908,7 +981,13 @@ def build():
     )
 
     # 12 Compliance
-    add_heading(doc, "12. Compliance Menu Explained", 1)
+    add_heading(doc, "12. Compliance (Project Setup) Explained", 1)
+    add_para(
+        doc,
+        "Compliance inputs and post-run analytics live under Project Setup → Compliance. There is no separate "
+        "Compliance item under Analysis navigation (to avoid duplicating Setup). From the Dashboard compliance card, "
+        "use Open Project Setup → Compliance to jump to that step.",
+    )
     add_heading(doc, "12.1 Applicability gates", 2)
     add_para(
         doc,
@@ -947,7 +1026,7 @@ def build():
             "CFE pass modes: All hours >= target | Mean hourly CFE >= target | Share of hours >= target.",
             "Default pass mode All hours >= target is a strict 24×7 rule. The demo 250 MW plant often Fails "
             "Annual RE (≈81% vs 90% target) and Hourly CFE (night hours drop well below 90%) until BESS/wind "
-            "is increased or targets/pass mode are relaxed under Compliance.",
+            "is increased or targets/pass mode are relaxed under Project Setup → Compliance.",
             "Dashboard CFE Pass Mode card shows: mode, target, min hour, % hours ≥ target, longest continuous deficit streak (hours), max deficit (pp).",
             "Dashboard Compliance Status shows actual vs target and a short “Why Fail?” note when status is Fail.",
             "CFE heatmap uses an absolute 0–100% colour scale (coral → amber → teal/green) so low night CFE "
@@ -1577,22 +1656,27 @@ def build():
         [
             "Demand charge = max_grid_import_mw × demand_charge_inr_per_mw_month × 12",
             "Fixed charge = fixed_charge_inr_per_year",
+            "Additional costs = sum of Financial → additional_costs annual ₹ rows (inflated in multi-year cashflows)",
             "DISCOM: RE energy cost = 0 (grid-only).",
             "CAPTIVE: RE energy cost = (RE_serving_load_mwh / (1 − loss_pct/100)) × 1,000 × captive_energy_price",
             "OPEN_ACCESS: same form with oa_energy_price",
             "HYBRID with include_generation_capex = False: "
             "RE energy cost = Solar_mwh×1,000×solar_energy_cost + Wind_mwh×1,000×wind_energy_cost",
             "HYBRID with include_generation_capex = True: RE tariff energy cost typically 0; CAPEX recovered via CRF",
-            "Network on RE (if apply_network_charges_to_re and not DISCOM): "
-            "RE_serving_load_mwh × 1,000 × (transmission + wheeling + banking_if_enabled + other)",
-            "Network on grid (if apply_network_charges_to_grid): Grid_mwh × 1,000 × (transmission + wheeling + other)",
+            "Network charges are per asset when that asset is included and its apply_network_charges_to_* flag is True:",
+            "  — Solar MWh × 1,000 × (solar transmission + wheeling + banking_if_enabled + other)",
+            "  — Wind MWh × 1,000 × (wind transmission + wheeling + banking_if_enabled + other)",
+            "  — BESS discharge MWh × 1,000 × (bess transmission + wheeling + other)",
+            "  — Grid import MWh × 1,000 × (grid/DISCOM transmission + wheeling + other) when apply_network_charges_to_grid",
+            "Legacy apply_network_charges_to_re / re_* rates are migrated into the per-asset fields when opening older projects.",
         ],
     )
 
     add_heading(doc, "17A.16 TOTAL COST OF DELIVERED ENERGY (₹/kWh)", 2)
     add_para(
         doc,
-        "Year-1 total annual cost = Grid energy + Demand + Fixed + RE energy + Network + OPEX + Annualised CAPEX + Compliance",
+        "Year-1 total annual cost = Grid energy + Demand + Fixed + RE energy + Network + OPEX + "
+        "Annualised CAPEX + Compliance + Additional costs",
         italic=True,
     )
     add_para(
@@ -1705,16 +1789,20 @@ def build():
     add_numbered(
         doc,
         [
-            "Launch EXE (or open Network URL if using a shared host) → Start with Default Model (or Create New Project).",
+            "Launch EXE (Chrome opens Start) or open Network URL if using a shared host → Create New Project "
+            "(or Open Existing Project… .pto.zip).",
             "Optional: open Settings → note Network URL if colleagues will join from other laptops.",
-            "Project Setup wizard: replace peak load, tariffs, CAPEX/OPEX, commercial structure and compliance applicability with project data. "
+            "Optional: Save Project to store a .pto.zip in a local folder.",
+            "Project Setup: select Architecture structure + assets; replace peak load, tariffs, CAPEX/OPEX, "
+            "Compliance applicability/targets and Financial (incl. Additional costs) with project data. "
             "Read the short help text under each parameter.",
             "Optional: Profiles → upload Load/Solar/Wind PROJECT DATA CSVs; confirm badges.",
             "Review Assumptions register — clear remaining critical defaults (Data Quality card will update after re-sim).",
             "Run 8760 Simulation → read Feasibility / Data Quality / CFE Pass Mode before KPI storytelling "
             "(numbers show as Lakh / Cr when large).",
             "Open Energy Ledger → confirm reconciliation OK and note config hash.",
-            "If status is NOT FEASIBLE, use binding constraints / remedies before optimizing.",
+            "If status is NOT FEASIBLE, use binding constraints / remedies before optimizing "
+            "(adjust Compliance in Project Setup if targets/pass mode need changing).",
             "Open 8760 Simulation page → pick Time window (month/week/day) → Show charts for critical periods.",
             "Architecture → Run Architecture Comparison → note RECOMMENDED only if a feasible architecture exists.",
             "Optimization → set RE/CFE constraints → Run Optimization → read explainability + optional marginal steps.",
@@ -1722,9 +1810,9 @@ def build():
             "Economics → review GRID-ONLY BASELINE and Incremental vs DISCOM.",
             "Scenarios → save named cases for board packs.",
             "Sensitivity → understand ₹/kWh drivers.",
-            "Reports → Export Excel and PDF; Backup Project.",
+            "Reports → Export Excel and PDF; Backup Project (.pto.zip) or top-bar Save Project.",
             "Independent legal/commercial review of RPO/RCO/ESO applicability before decisions.",
-            "When finished on the host: Quit App in the sidebar so the EXE exits and network users disconnect.",
+            "When finished: Quit App (or close the Chrome tab) so the host EXE exits and network users disconnect.",
         ],
     )
 
@@ -1759,10 +1847,10 @@ def build():
             "SQLite database auto-created on first launch (typically under %LOCALAPPDATA%\\PowerTrainOptimizer for the EXE).",
             "ACCESS_URLS.txt is written on each launch (LocalAppData and beside the EXE) with This PC + Network URLs.",
             "Projects, inputs, scenarios, settings and run metadata persist across restarts.",
+            "Save Project / Backup Project write a portable .pto.zip you can store anywhere and later restore via Open Existing Project….",
             "Hourly arrays for saved runs are stored efficiently (e.g. under data/runs as NPZ), not as 8,760 SQL rows.",
             "Energy ledger JSON is stored beside the run (sim_<id>_ledger.json).",
             "Imported PROJECT DATA profiles are stored under data/profiles/project_<id>/.",
-            "Use Reports → Backup Project for portable archives.",
             "Before schema migrations the app backs up the database automatically.",
             "To distribute the app itself (not project data), copy dist\\PowerTrain_Share\\ or the standalone EXE.",
         ],
@@ -1774,15 +1862,18 @@ def build():
         doc,
         ["Symptom", "What to do"],
         [
-            ["Browser does not open", "Wait ~30–60 s on first launch. If still closed, Task Manager may show PowerTrainOptimizer.exe — end it and relaunch. Open http://127.0.0.1:8765/ manually, or read ACCESS_URLS.txt. Developer mode: check the terminal."],
-            ["Port already in use", "Close other PowerTrain instances (Quit App or end the process); the launcher picks an available port."],
-            ["EXE keeps running after closing browser", "Expected in LAN mode (default). Use Quit App to stop. Local-only: set PTO_HOST=127.0.0.1."],
-            ["Colleague cannot open Network URL", "Same Wi‑Fi/LAN? Firewall allowed Private? Host EXE still running? Correct IP:port from Settings / ACCESS_URLS.txt? Guest Wi‑Fi isolation off?"],
+            ["Browser does not open", "Wait ~30–60 s on first launch. If still closed, Task Manager may show PowerTrainOptimizer.exe — Quit App or end it and relaunch. Open http://127.0.0.1:8765/ manually, or read ACCESS_URLS.txt. Developer mode: check the terminal."],
+            ["Port already in use / multiple EXEs", "Quit App (clears orphans) or end PowerTrainOptimizer.exe in Task Manager; relaunching an already-live instance reopens the UI instead of stacking servers."],
+            ["EXE keeps running after closing browser", "Should stop within a few seconds. If not, use Quit App or Task Manager. Rebuild to the latest EXE if you are on an older keep-alive build."],
+            ["Cannot overwrite EXE while building", "Quit App / end PowerTrainOptimizer.exe first — Windows locks dist\\PowerTrainOptimizer.exe while it is running."],
+            ["Colleague cannot open Network URL", "Same Wi‑Fi/LAN? Firewall allowed Private? Host EXE still running with a UI heartbeat or guest tab open? Correct IP:port from Settings / ACCESS_URLS.txt? Guest Wi‑Fi isolation off?"],
             ["Network URLs empty in Settings", "No LAN IP detected, or PTO_HOST=127.0.0.1. Connect Ethernet/Wi‑Fi and restart the EXE."],
+            ["Opens Edge instead of Chrome", "Install Chrome, or set PTO_BROWSER=chrome. Use PTO_BROWSER=edge|default to force Edge / system browser."],
             ["Unhandled exception … isatty / Unable to configure formatter", "You are on an old windowed EXE. Use the rebuild that redirects stdout/stderr and uses a safe uvicorn log config."],
             ["Slow first open", "Normal on cold start (unpack + DB create). Later launches reuse the DB and should be faster."],
-            ["Annual RE / Hourly CFE show Fail on demo", "Expected under default 90% targets with strict All-hours CFE mode. Raise BESS/wind, lower targets, or change CFE pass mode."],
+            ["Annual RE / Hourly CFE show Fail on demo", "Expected under default 90% targets with strict All-hours CFE mode. Raise BESS/wind, lower targets, or change CFE pass mode in Project Setup → Compliance."],
             ["Dashboard says NOT FEASIBLE but costs look fine", "Feasibility is target-driven. Read binding constraints; do not treat as RECOMMENDED."],
+            ["Where is the Compliance menu?", "Under Project Setup → Compliance (removed from Analysis nav). Dashboard has a shortcut link."],
             ["DISCOM shows 0% RE/CFE and — for IRR/Payback", "Expected: DISCOM is GRID-ONLY BASELINE (no RE assets). IRR/Payback apply to investment cases vs DISCOM."],
             ["STALE RESULTS banner", "Inputs changed after the last run — click Run 8760 Simulation again."],
             ["MODEL ERROR: PROJECT DATA … no profile", "Upload the CSV under Profiles or set profile_source back to SYNTHETIC."],
@@ -1796,8 +1887,8 @@ def build():
             ["Numbers look like long digit strings", "Hard-refresh Ctrl+F5 or relaunch latest EXE — UI should show Lakh / Cr for large values."],
             ["Parameter meaning unclear", "Read the grey help text under each field title; full list also in Assumptions and Section 9 of this guide."],
             ["UI looks old / charts not updated", "Hard-refresh the browser (Ctrl+F5) or relaunch the latest Model 2.0 EXE."],
-            ["Default still 100 MW / Model 1.0.0", "You are on an old database/EXE — use the Model 2.0 rebuild, or create a new project from current defaults."],
-            ["Need to reset demo", "Create New Project, or delete the old default project after backing up."],
+            ["Default still 100 MW / Model 1.0.0", "You are on an old database/EXE — use the Model 2.0 rebuild, or Create New Project from current defaults."],
+            ["Need to reset / transfer a project", "Create New Project, or Open Existing Project… with a .pto.zip from Save Project / Backup Project."],
             ["How do I give the app to someone else?", "Copy dist\\PowerTrain_Share\\ (or just the EXE + HOW_TO_SHARE.txt). No install required."],
         ],
     )
@@ -1832,13 +1923,18 @@ def build():
             ["NPV / IRR / Payback", "Project finance metrics; for non-DISCOM use incremental vs DISCOM cashflows"],
             ["TOTAL COST OF DELIVERED ENERGY", "₹/kWh = annualised cost / load energy in this model"],
             ["Incremental vs DISCOM", "ΔCAPEX and annual bill savings vs GRID-ONLY BASELINE"],
-            ["Quit App", "Sidebar control that shuts down the local server and exits the EXE (disconnects LAN users)"],
+            ["Quit App", "Sidebar control that stops the server and background PowerTrain processes (disconnects LAN users)"],
+            ["Save Project", "Top-bar action that saves inputs and writes a portable .pto.zip to a folder you choose"],
+            [".pto.zip", "Portable project backup/restore archive (Open Existing Project… / Backup Project)"],
+            ["Asset selection", "include_discom / include_solar / include_wind / include_bess flags that gate Setup tabs and capacities"],
+            ["Additional costs", "Named annual ₹ line items under Financial included in delivered-energy cost"],
             ["LAN / Network URL", "http://<host-LAN-IP>:<port>/ so other PCs on the same network can use the host’s running app"],
             ["ACCESS_URLS.txt", "File written on launch with This PC and Network URLs"],
             ["Lakh / Cr display", "Compact UI number format: under 1 Lakh full digits; then Lakh; then Cr"],
             ["Time window", "8760 Simulation control: Full year / One month / One week / One day"],
             ["Parameter help", "Short explanation shown under each editable field title in the UI"],
             ["PTO_HOST", "Optional env var; 0.0.0.0 = LAN share (default), 127.0.0.1 = this PC only"],
+            ["PTO_BROWSER", "Optional env var; chrome (default) | edge | default — which browser the launcher opens"],
         ],
     )
 
@@ -1851,10 +1947,11 @@ def build():
     )
     add_para(
         doc,
-        "This User Guide was regenerated to match the implemented Model 2.0 UI menus, feasibility rules, "
-        "Energy Ledger, Profiles import, incremental economics, optimization explainability, reports, "
-        "portable EXE / LAN network sharing, on-screen parameter help text, compact Lakh/Cr number formatting, "
-        "the redesigned 8760 Simulation Time window controls, and Section 17A detailed calculations "
+        "This User Guide was regenerated to match the current product: Create New / Open Existing (.pto.zip) / "
+        "Save Project, architecture asset selection, per-asset network charges, Additional costs, Compliance only "
+        "in Project Setup, Chrome-tab launch, Quit App and tab-close shutdown of background processes, "
+        "single-instance reuse, LAN sharing, on-screen parameter help, compact Lakh/Cr formatting, "
+        "8760 Time window controls, and Section 17A detailed calculations "
         "(profiles, dispatch, RE/CFE, compliance costs, CAPEX/OPEX/CRF, ₹/kWh, NPV/IRR/payback, "
         "incremental vs DISCOM, ledger identities, optimization ranking).",
     )

@@ -7,22 +7,29 @@ PowerTrain Optimizer — how to run & share on a network
 - Double-click on any Windows 10/11 laptop.
 - No Python, Node, or database install is required.
 - The first run may take 20–60 seconds while Windows extracts the app.
-- Your browser opens automatically to the local address
-  (usually http://127.0.0.1:8765/).
+- Chrome opens a tab to the local address (usually http://127.0.0.1:8765/)
+  when Chrome is installed; otherwise Edge / system browser is used.
+- If the app is already running, a second double-click reopens that UI
+  instead of starting another background server.
 
 Project data is stored on that laptop under:
   %LOCALAPPDATA%\PowerTrainOptimizer\
+
+Save / restore a project file:
+  - In the app: Save Project (top bar) → chooses a local .pto.zip
+  - Later: Start screen → Open Existing Project… → pick the .pto.zip
 
 
 2) SHARE ON THE OFFICE / Wi‑Fi NETWORK
 --------------------------------------
 Host laptop (runs the EXE):
-  1. Start PowerTrainOptimizer.exe and leave it running.
+  1. Start PowerTrainOptimizer.exe and leave it running (keep a browser tab open).
   2. Open Settings in the app — you will see Network URLs like:
        http://192.168.x.x:8765/
      Or open ACCESS_URLS.txt next to the EXE / in LocalAppData.
   3. If Windows Firewall asks, choose Allow on Private networks.
-  4. Do NOT click Quit App until everyone is finished.
+  4. Quit App (or close the host tab) when everyone is finished —
+     that stops the server for all users.
 
 Other people on the same network:
   1. Open Chrome / Edge / any browser.
@@ -37,12 +44,15 @@ Notes:
 - Local-only mode (no network): set environment variable
     PTO_HOST=127.0.0.1
   before starting the EXE.
+- Optional browser preference:
+    PTO_BROWSER=chrome|edge|default
 
 
 3) STOP THE APP
 ---------------
-Click Quit App in the left sidebar on the host.
-That stops the server for everyone.
+- Quit App in the left sidebar on the host (stops server + orphan EXE copies), or
+- Close the browser tab — the background process exits within a few seconds.
+Then close any leftover Chrome tab if it still shows “PowerTrain closed”.
 
 
 Avaada PowerTrain Optimizer
