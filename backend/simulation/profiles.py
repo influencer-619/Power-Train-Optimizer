@@ -14,6 +14,25 @@ def _month_factors(section: dict, prefix: str) -> np.ndarray:
     return np.array([float(section[f"{prefix}{i}"]["value"]) for i in range(1, 13)], dtype=float)
 
 
+# Month index 0..11 → Indian season: Winter, Summer, Monsoon, Post-monsoon
+# Winter Dec–Feb | Summer Mar–May | Monsoon Jun–Sep | Post-monsoon Oct–Nov
+_SEASON_BY_MONTH = np.array([0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 0], dtype=int)
+_SEASON_KEYS = ("seasonal_winter", "seasonal_summer", "seasonal_monsoon", "seasonal_post_monsoon")
+
+
+def _season_factors_12(section: dict, legacy_prefix: str | None = None) -> np.ndarray:
+    """Return length-12 month multipliers from 4 seasonal factors (or legacy 12-month keys)."""
+    if all(k in section for k in _SEASON_KEYS):
+        seasons = np.array([float(section[k]["value"]) for k in _SEASON_KEYS], dtype=float)
+        return seasons[_SEASON_BY_MONTH]
+    if legacy_prefix:
+        try:
+            return _month_factors(section, legacy_prefix)
+        except Exception:
+            pass
+    return np.ones(12, dtype=float)
+
+
 def generate_load(config: dict, hours: int = HOURS) -> dict:
     cal = get_calendar(hours)
     peak = float(v(config, "load.peak_load_mw"))
@@ -91,7 +110,7 @@ def generate_solar(config: dict, hours: int = HOURS, capacity_override: float | 
     peak_h = float(v(config, "solar.peak_generation_hour"))
     variability = float(v(config, "solar.hourly_variability"))
     seed = int(v(config, "general.random_seed"))
-    seasonal = _month_factors(config["solar"], "seasonal_")
+    seasonal = _season_factors_12(config["solar"], legacy_prefix="seasonal_")
 
     hod = cal.hour_of_day.astype(float)
     daylight = (hod >= sunrise) & (hod < sunset)
@@ -124,7 +143,7 @@ def generate_wind(config: dict, hours: int = HOURS, capacity_override: float | N
     cf = float(v(config, "wind.capacity_factor_pct")) / 100.0
     variability = float(v(config, "wind.hourly_variability"))
     seed = int(v(config, "general.random_seed"))
-    monthly = _month_factors(config["wind"], "month_")
+    monthly = _season_factors_12(config["wind"], legacy_prefix="month_")
 
     base = monthly[cal.month].astype(float)
     # Mild diurnal preference for afternoon/evening without forcing zeros

@@ -99,10 +99,30 @@ DEFAULT_CONFIG = {
             2026,
             "",
             DEFAULT_ASSUMPTION,
-            "Label year for timestamps. Not a leap year.",
+            "Study year shown as 01 Jan – 31 Dec in the top bar. Choose any year 2020–2100. "
+            "The hourly engine still runs 8,760 non-leap hours (29 Feb is not modelled).",
             kind="integer",
             minimum=2020,
             maximum=2100,
+        ),
+        "re_curtailment_scope": P(
+            "Solar + Wind",
+            "",
+            DEFAULT_ASSUMPTION,
+            "Which renewable generation the curtailment % applies to: Solar only, Wind only, or Solar + Wind.",
+            kind="select",
+            options=["Solar + Wind", "Solar only", "Wind only"],
+        ),
+        "re_curtailment_pct": P(
+            0.0,
+            "% of RE",
+            DEFAULT_ASSUMPTION,
+            "Assumed / forced curtailment as a percentage of the selected RE scope (see RE curtailment scope). "
+            "That share is removed before serving load or charging BESS. Additional curtailment can still "
+            "occur if leftover RE cannot be absorbed. Editable input — not only a calculated KPI.",
+            minimum=0,
+            maximum=100,
+            step=0.1,
         ),
         "random_seed": P(
             42,
@@ -286,25 +306,45 @@ DEFAULT_CONFIG = {
         "capex_inr_per_mw": P(45_000_000.0, "₹/MW", DEFAULT_ASSUMPTION, "Solar overnight CAPEX."),
         "opex_inr_per_mw_year": P(600_000.0, "₹/MW-yr", DEFAULT_ASSUMPTION, "Solar fixed OPEX."),
         "energy_cost_inr_per_kwh": P(2.50, "₹/kWh", DEFAULT_ASSUMPTION, "Contracted solar energy price when the commercial structure uses an energy tariff rather than CAPEX recovery."),
-        "seasonal_1": P(0.78, "x", DEFAULT_ASSUMPTION, "January solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_2": P(0.88, "x", DEFAULT_ASSUMPTION, "February solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_3": P(1.02, "x", DEFAULT_ASSUMPTION, "March solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_4": P(1.12, "x", DEFAULT_ASSUMPTION, "April solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_5": P(1.18, "x", DEFAULT_ASSUMPTION, "May solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_6": P(1.05, "x", DEFAULT_ASSUMPTION, "June solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_7": P(0.92, "x", DEFAULT_ASSUMPTION, "July solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_8": P(0.90, "x", DEFAULT_ASSUMPTION, "August solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_9": P(0.98, "x", DEFAULT_ASSUMPTION, "September solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_10": P(1.05, "x", DEFAULT_ASSUMPTION, "October solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_11": P(0.90, "x", DEFAULT_ASSUMPTION, "November solar seasonal factor.", minimum=0, step=0.01),
-        "seasonal_12": P(0.75, "x", DEFAULT_ASSUMPTION, "December solar seasonal factor.", minimum=0, step=0.01),
+        "seasonal_winter": P(
+            0.80,
+            "x",
+            DEFAULT_ASSUMPTION,
+            "Solar seasonal factor for Winter (Dec–Feb).",
+            minimum=0,
+            step=0.01,
+        ),
+        "seasonal_summer": P(
+            1.11,
+            "x",
+            DEFAULT_ASSUMPTION,
+            "Solar seasonal factor for Summer (Mar–May).",
+            minimum=0,
+            step=0.01,
+        ),
+        "seasonal_monsoon": P(
+            0.96,
+            "x",
+            DEFAULT_ASSUMPTION,
+            "Solar seasonal factor for Monsoon (Jun–Sep).",
+            minimum=0,
+            step=0.01,
+        ),
+        "seasonal_post_monsoon": P(
+            0.98,
+            "x",
+            DEFAULT_ASSUMPTION,
+            "Solar seasonal factor for Post-monsoon (Oct–Nov).",
+            minimum=0,
+            step=0.01,
+        ),
     },
     "wind": {
         "profile_source": P(
             "SYNTHETIC",
             "",
             DEFAULT_ASSUMPTION,
-            "SYNTHETIC = CF/monthly generator. PROJECT DATA = imported 8,760 hourly MW series (optional).",
+            "SYNTHETIC = CF/seasonal generator. PROJECT DATA = imported 8,760 hourly MW series (optional).",
             kind="select",
             options=["SYNTHETIC", "PROJECT DATA"],
         ),
@@ -316,18 +356,38 @@ DEFAULT_CONFIG = {
         "capex_inr_per_mw": P(65_000_000.0, "₹/MW", DEFAULT_ASSUMPTION, "Wind overnight CAPEX."),
         "opex_inr_per_mw_year": P(1_200_000.0, "₹/MW-yr", DEFAULT_ASSUMPTION, "Wind fixed OPEX."),
         "energy_cost_inr_per_kwh": P(3.20, "₹/kWh", DEFAULT_ASSUMPTION, "Contracted wind energy price when used as a tariff."),
-        "month_1": P(0.70, "x", DEFAULT_ASSUMPTION, "January wind monthly factor.", minimum=0, step=0.01),
-        "month_2": P(0.75, "x", DEFAULT_ASSUMPTION, "February wind monthly factor.", minimum=0, step=0.01),
-        "month_3": P(0.82, "x", DEFAULT_ASSUMPTION, "March wind monthly factor.", minimum=0, step=0.01),
-        "month_4": P(0.92, "x", DEFAULT_ASSUMPTION, "April wind monthly factor.", minimum=0, step=0.01),
-        "month_5": P(1.10, "x", DEFAULT_ASSUMPTION, "May wind monthly factor.", minimum=0, step=0.01),
-        "month_6": P(1.35, "x", DEFAULT_ASSUMPTION, "June wind monthly factor.", minimum=0, step=0.01),
-        "month_7": P(1.45, "x", DEFAULT_ASSUMPTION, "July wind monthly factor.", minimum=0, step=0.01),
-        "month_8": P(1.25, "x", DEFAULT_ASSUMPTION, "August wind monthly factor.", minimum=0, step=0.01),
-        "month_9": P(1.05, "x", DEFAULT_ASSUMPTION, "September wind monthly factor.", minimum=0, step=0.01),
-        "month_10": P(0.88, "x", DEFAULT_ASSUMPTION, "October wind monthly factor.", minimum=0, step=0.01),
-        "month_11": P(0.78, "x", DEFAULT_ASSUMPTION, "November wind monthly factor.", minimum=0, step=0.01),
-        "month_12": P(0.72, "x", DEFAULT_ASSUMPTION, "December wind monthly factor.", minimum=0, step=0.01),
+        "seasonal_winter": P(
+            0.72,
+            "x",
+            DEFAULT_ASSUMPTION,
+            "Wind seasonal factor for Winter (Dec–Feb).",
+            minimum=0,
+            step=0.01,
+        ),
+        "seasonal_summer": P(
+            0.95,
+            "x",
+            DEFAULT_ASSUMPTION,
+            "Wind seasonal factor for Summer (Mar–May).",
+            minimum=0,
+            step=0.01,
+        ),
+        "seasonal_monsoon": P(
+            1.28,
+            "x",
+            DEFAULT_ASSUMPTION,
+            "Wind seasonal factor for Monsoon (Jun–Sep).",
+            minimum=0,
+            step=0.01,
+        ),
+        "seasonal_post_monsoon": P(
+            0.83,
+            "x",
+            DEFAULT_ASSUMPTION,
+            "Wind seasonal factor for Post-monsoon (Oct–Nov).",
+            minimum=0,
+            step=0.01,
+        ),
     },
     "bess": {
         "power_mw": P(150.0, "MW", DEFAULT_ASSUMPTION, "BESS power rating (charge and discharge unless overridden).", minimum=0, step=1),
@@ -361,14 +421,29 @@ DEFAULT_CONFIG = {
         "tod_offpeak_tariff": P(7.50, "₹/kWh", DEFAULT_ASSUMPTION, "Off-peak energy tariff."),
         "demand_charge_inr_per_mw_month": P(400_000.0, "₹/MW-month", DEFAULT_ASSUMPTION, "Applied to the annual peak grid import."),
         "fixed_charge_inr_per_year": P(12_000_000.0, "₹/yr", DEFAULT_ASSUMPTION, "Annual fixed grid/connection charge."),
-        "transmission_inr_per_kwh": P(0.40, "₹/kWh", DEFAULT_ASSUMPTION, "Transmission charge applied to wheeled/imported energy as configured by structure."),
-        "wheeling_inr_per_kwh": P(0.30, "₹/kWh", DEFAULT_ASSUMPTION, "Wheeling charge."),
-        "banking_inr_per_kwh": P(0.10, "₹/kWh", DEFAULT_ASSUMPTION, "Banking-related charge. Applied only when banking_enabled."),
-        "other_charges_inr_per_kwh": P(0.15, "₹/kWh", DEFAULT_ASSUMPTION, "Other configurable volumetric charges."),
+        "transmission_inr_per_kwh": P(
+            0.40,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "DISCOM / grid import transmission charge. Used when Network charges on grid is True.",
+        ),
+        "wheeling_inr_per_kwh": P(
+            0.30,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "DISCOM / grid import wheeling charge. Used when Network charges on grid is True.",
+        ),
+        "banking_inr_per_kwh": P(0.10, "₹/kWh", DEFAULT_ASSUMPTION, "Legacy banking unit rate (kept for Grid tab). RE banking uses commercial.re_banking_inr_per_kwh."),
+        "other_charges_inr_per_kwh": P(
+            0.15,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "DISCOM / grid import other volumetric charges. Used when Network charges on grid is True.",
+        ),
         "loss_pct": P(3.0, "%", DEFAULT_ASSUMPTION, "Grid/network loss applied to wheeled RE in captive/OA structures."),
         "availability_pct": P(99.5, "%", DEFAULT_ASSUMPTION, "Deterministic availability: first (1-a)×8760 hours of each year are scaled; implemented as a constant derate of max import."),
         "tariff_escalation_pct": P(4.0, "%/yr", DEFAULT_ASSUMPTION, "Grid tariff escalation in the financial model."),
-        "banking_enabled": P(False, "", DEFAULT_ASSUMPTION, "If false, banking charges are zero regardless of the unit rate.", kind="boolean"),
+        "banking_enabled": P(False, "", DEFAULT_ASSUMPTION, "Legacy Grid-tab banking switch. RE banking uses commercial.re_banking_enabled.", kind="boolean"),
     },
     "commercial": {
         "structure": P(
@@ -378,6 +453,35 @@ DEFAULT_CONFIG = {
             "Selected commercial structure. Hybrid is the primary optimisation architecture in the concept note.",
             kind="select",
             options=["DISCOM", "CAPTIVE", "HYBRID", "OPEN_ACCESS"],
+        ),
+        "include_discom": P(
+            True,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Include DISCOM / grid supply in this architecture. For DISCOM structure this is always on. "
+            "Selectable for HYBRID and OPEN ACCESS.",
+            kind="boolean",
+        ),
+        "include_solar": P(
+            True,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Include solar generation. Selectable for CAPTIVE, HYBRID and OPEN ACCESS. Off for DISCOM.",
+            kind="boolean",
+        ),
+        "include_wind": P(
+            True,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Include wind generation. Selectable for CAPTIVE, HYBRID and OPEN ACCESS. Off for DISCOM.",
+            kind="boolean",
+        ),
+        "include_bess": P(
+            True,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Include BESS. Selectable for CAPTIVE, HYBRID and OPEN ACCESS. Off for DISCOM.",
+            kind="boolean",
         ),
         "discom_name": P("MSEDCL", "", CONCEPT_NOTE, "DISCOM counterparty name referenced in the concept note DISCOM structure.", kind="text"),
         "captive_ownership_pct": P(26.0, "%", DEFAULT_ASSUMPTION, "Captive ownership share. Not a legal qualification test."),
@@ -391,8 +495,144 @@ DEFAULT_CONFIG = {
             "If true, solar/wind/BESS CAPEX enters the cash-flow (typical for hybrid ownership). If false, generation is treated as a tariff (typical for some OA/captive contracts).",
             kind="boolean",
         ),
-        "apply_network_charges_to_re": P(True, "", DEFAULT_ASSUMPTION, "Apply transmission/wheeling/other charges to renewable energy served.", kind="boolean"),
-        "apply_network_charges_to_grid": P(False, "", DEFAULT_ASSUMPTION, "Apply transmission/wheeling to grid import in addition to the DISCOM energy tariff.", kind="boolean"),
+        "apply_network_charges_to_re": P(
+            True,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Legacy combined RE network flag (migrated into Solar / Wind flags). Kept for older projects.",
+            kind="boolean",
+        ),
+        "apply_network_charges_to_solar": P(
+            True,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Apply Solar-specific transmission/wheeling/banking/other charges to annual solar generation.",
+            kind="boolean",
+        ),
+        "apply_network_charges_to_wind": P(
+            True,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Apply Wind-specific transmission/wheeling/banking/other charges to annual wind generation.",
+            kind="boolean",
+        ),
+        "apply_network_charges_to_bess": P(
+            True,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Apply BESS-specific transmission/wheeling/banking/other charges to annual BESS discharge energy.",
+            kind="boolean",
+        ),
+        "apply_network_charges_to_grid": P(
+            False,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Apply DISCOM/grid-specific transmission/wheeling/other charges to grid import in addition to the energy tariff.",
+            kind="boolean",
+        ),
+        "re_transmission_inr_per_kwh": P(
+            0.40,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Legacy combined RE transmission rate (migrated into Solar / Wind rates).",
+        ),
+        "re_wheeling_inr_per_kwh": P(0.30, "₹/kWh", DEFAULT_ASSUMPTION, "Legacy combined RE wheeling rate."),
+        "re_other_charges_inr_per_kwh": P(0.15, "₹/kWh", DEFAULT_ASSUMPTION, "Legacy combined RE other volumetric rate."),
+        "re_banking_enabled": P(False, "", DEFAULT_ASSUMPTION, "Legacy combined RE banking switch.", kind="boolean"),
+        "re_banking_inr_per_kwh": P(0.10, "₹/kWh", DEFAULT_ASSUMPTION, "Legacy combined RE banking rate."),
+        "solar_transmission_inr_per_kwh": P(
+            0.40,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Solar network transmission charge. Independent of Wind and DISCOM rates.",
+        ),
+        "solar_wheeling_inr_per_kwh": P(
+            0.30,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Solar network wheeling charge. Independent of Wind and DISCOM rates.",
+        ),
+        "solar_other_charges_inr_per_kwh": P(
+            0.15,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Solar other volumetric network charges.",
+        ),
+        "solar_banking_enabled": P(
+            False,
+            "",
+            DEFAULT_ASSUMPTION,
+            "If false, Solar banking charges are zero regardless of the Solar banking unit rate.",
+            kind="boolean",
+        ),
+        "solar_banking_inr_per_kwh": P(
+            0.10,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Solar banking-related charge. Applied only when Solar banking is enabled.",
+        ),
+        "wind_transmission_inr_per_kwh": P(
+            0.40,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Wind network transmission charge. Independent of Solar and DISCOM rates.",
+        ),
+        "wind_wheeling_inr_per_kwh": P(
+            0.30,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Wind network wheeling charge. Independent of Solar and DISCOM rates.",
+        ),
+        "wind_other_charges_inr_per_kwh": P(
+            0.15,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Wind other volumetric network charges.",
+        ),
+        "wind_banking_enabled": P(
+            False,
+            "",
+            DEFAULT_ASSUMPTION,
+            "If false, Wind banking charges are zero regardless of the Wind banking unit rate.",
+            kind="boolean",
+        ),
+        "wind_banking_inr_per_kwh": P(
+            0.10,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Wind banking-related charge. Applied only when Wind banking is enabled.",
+        ),
+        "bess_transmission_inr_per_kwh": P(
+            0.40,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "BESS network transmission charge on discharge energy. Independent of Solar / Wind / DISCOM rates.",
+        ),
+        "bess_wheeling_inr_per_kwh": P(
+            0.30,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "BESS network wheeling charge on discharge energy.",
+        ),
+        "bess_other_charges_inr_per_kwh": P(
+            0.15,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "BESS other volumetric network charges on discharge energy.",
+        ),
+        "bess_banking_enabled": P(
+            False,
+            "",
+            DEFAULT_ASSUMPTION,
+            "If false, BESS banking charges are zero regardless of the BESS banking unit rate.",
+            kind="boolean",
+        ),
+        "bess_banking_inr_per_kwh": P(
+            0.10,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "BESS banking-related charge. Applied only when BESS banking is enabled.",
+        ),
     },
     "compliance": {
         "rpo_applicability": P(
@@ -471,6 +711,13 @@ DEFAULT_CONFIG = {
         "debt_pct": P(70.0, "%", DEFAULT_ASSUMPTION, "Debt share of CAPEX if financing is enabled."),
         "interest_rate_pct": P(9.0, "%", DEFAULT_ASSUMPTION, "Interest on outstanding debt."),
         "debt_tenor_yr": P(15, "yr", DEFAULT_ASSUMPTION, "Sculpted as equal principal + interest on outstanding.", kind="integer"),
+        "additional_costs": P(
+            [],
+            "₹/yr",
+            DEFAULT_ASSUMPTION,
+            "User-defined additional annual cost line items (label + amount). Included in delivered ₹/kWh and cashflows.",
+            kind="list",
+        ),
     },
     "optimization": {
         "objective": P(
@@ -527,12 +774,7 @@ DEFAULT_CONFIG = {
 PRESET_RE_TARGETS = [90.0, 95.0, 99.0]
 PRESET_CFE_TARGETS = [90.0, 95.0, 99.0, 100.0]
 
-DEFAULT_SCENARIOS = [
-    {"name": "DISCOM – 90% RE", "structure": "DISCOM", "annual_re_target_pct": 90.0, "hourly_cfe_target_pct": 90.0},
-    {"name": "CAPTIVE – 95% RE", "structure": "CAPTIVE", "annual_re_target_pct": 95.0, "hourly_cfe_target_pct": 90.0},
-    {"name": "HYBRID – 95% RE / 99% CFE", "structure": "HYBRID", "annual_re_target_pct": 95.0, "hourly_cfe_target_pct": 99.0},
-    {"name": "OPEN ACCESS – 99% RE / 100% CFE", "structure": "OPEN_ACCESS", "annual_re_target_pct": 99.0, "hourly_cfe_target_pct": 100.0},
-]
+DEFAULT_SCENARIOS = []  # Architecture is chosen in Project Setup — do not seed structure presets here
 
 
 def get_default_config():
@@ -576,6 +818,161 @@ def recompute_calculated(config: dict) -> dict:
     config["bess"]["round_trip_efficiency_pct"]["value"] = round(ce * de * 100.0, 4)
     config["grid"]["connection_voltage_kv"]["value"] = v(config, "data_center.grid_connection_kv")
     return config
+
+
+def _normalize_architecture_flags(config: dict) -> None:
+    """Keep include_* flags consistent with commercial structure (UI + old projects)."""
+    commercial = config.get("commercial")
+    if not isinstance(commercial, dict):
+        return
+    structure_p = commercial.get("structure")
+    structure = str(structure_p.get("value", "HYBRID")) if isinstance(structure_p, dict) else "HYBRID"
+
+    def set_flag(key: str, val: bool) -> None:
+        p = commercial.get(key)
+        if isinstance(p, dict) and "value" in p:
+            p["value"] = val
+
+    if structure == "DISCOM":
+        set_flag("include_discom", True)
+        set_flag("include_solar", False)
+        set_flag("include_wind", False)
+        set_flag("include_bess", False)
+    elif structure == "CAPTIVE":
+        # Captive: Solar / Wind / BESS only — DISCOM is not an option
+        set_flag("include_discom", False)
+
+
+def merge_missing_defaults(config: dict) -> dict:
+    """Add any new default parameters missing from older saved projects."""
+    _migrate_solar_wind_to_seasons(config)
+    defaults = get_default_config()
+    newly_added: list[tuple[str, str]] = []
+    for section, params in defaults.items():
+        if not isinstance(params, dict):
+            continue
+        if section not in config or not isinstance(config[section], dict):
+            config[section] = deepcopy(params)
+            continue
+        for key, param in params.items():
+            if key not in config[section]:
+                config[section][key] = deepcopy(param)
+                newly_added.append((section, key))
+    _seed_re_network_from_grid(config, newly_added)
+    _seed_solar_wind_network_from_re(config, newly_added)
+    _normalize_architecture_flags(config)
+    return config
+
+
+def _seed_re_network_from_grid(config: dict, newly_added: list[tuple[str, str]]) -> None:
+    """When RE network rates are first introduced, copy prior Grid rates so behaviour is unchanged."""
+    mapping = {
+        "re_transmission_inr_per_kwh": "transmission_inr_per_kwh",
+        "re_wheeling_inr_per_kwh": "wheeling_inr_per_kwh",
+        "re_other_charges_inr_per_kwh": "other_charges_inr_per_kwh",
+        "re_banking_inr_per_kwh": "banking_inr_per_kwh",
+        "re_banking_enabled": "banking_enabled",
+    }
+    commercial = config.get("commercial")
+    grid = config.get("grid")
+    if not isinstance(commercial, dict) or not isinstance(grid, dict):
+        return
+    added = {k for sec, k in newly_added if sec == "commercial"}
+    for re_key, grid_key in mapping.items():
+        if re_key not in added:
+            continue
+        gp = grid.get(grid_key)
+        rp = commercial.get(re_key)
+        if isinstance(gp, dict) and "value" in gp and isinstance(rp, dict):
+            rp["value"] = deepcopy(gp["value"])
+            if gp.get("source"):
+                rp["source"] = gp["source"]
+
+
+def _seed_solar_wind_network_from_re(config: dict, newly_added: list[tuple[str, str]]) -> None:
+    """Seed separate Solar/Wind network params from legacy combined RE network params."""
+    commercial = config.get("commercial")
+    if not isinstance(commercial, dict):
+        return
+    added = {k for sec, k in newly_added if sec == "commercial"}
+    legacy_flag = commercial.get("apply_network_charges_to_re")
+    legacy_map = {
+        "transmission_inr_per_kwh": "re_transmission_inr_per_kwh",
+        "wheeling_inr_per_kwh": "re_wheeling_inr_per_kwh",
+        "other_charges_inr_per_kwh": "re_other_charges_inr_per_kwh",
+        "banking_enabled": "re_banking_enabled",
+        "banking_inr_per_kwh": "re_banking_inr_per_kwh",
+    }
+    for asset in ("solar", "wind", "bess"):
+        flag_key = f"apply_network_charges_to_{asset}"
+        if flag_key in added and isinstance(legacy_flag, dict) and "value" in legacy_flag:
+            p = commercial.get(flag_key)
+            if isinstance(p, dict):
+                p["value"] = deepcopy(legacy_flag["value"])
+                if legacy_flag.get("source"):
+                    p["source"] = legacy_flag["source"]
+        for suffix, legacy_key in legacy_map.items():
+            new_key = f"{asset}_{suffix}"
+            if new_key not in added:
+                continue
+            src = commercial.get(legacy_key)
+            dst = commercial.get(new_key)
+            if isinstance(src, dict) and "value" in src and isinstance(dst, dict):
+                dst["value"] = deepcopy(src["value"])
+                if src.get("source"):
+                    dst["source"] = src["source"]
+
+
+def _avg_month_values(section: dict, prefix: str, months_1based: list[int], fallback: float) -> float:
+    vals = []
+    for m in months_1based:
+        key = f"{prefix}{m}"
+        p = section.get(key)
+        if isinstance(p, dict) and "value" in p:
+            try:
+                vals.append(float(p["value"]))
+            except Exception:
+                pass
+    return round(sum(vals) / len(vals), 4) if vals else fallback
+
+
+def _migrate_solar_wind_to_seasons(config: dict) -> None:
+    """Replace legacy 12 monthly factors with 4 Indian seasonal factors on solar/wind."""
+    season_defs = (
+        ("seasonal_winter", [12, 1, 2]),
+        ("seasonal_summer", [3, 4, 5]),
+        ("seasonal_monsoon", [6, 7, 8, 9]),
+        ("seasonal_post_monsoon", [10, 11]),
+    )
+    defaults = get_default_config()
+    for section, legacy_prefix in (("solar", "seasonal_"), ("wind", "month_")):
+        sec = config.get(section)
+        if not isinstance(sec, dict):
+            continue
+
+        has_legacy = any(f"{legacy_prefix}{i}" in sec for i in range(1, 13))
+        has_new = all(k in sec for k, _ in season_defs)
+
+        if has_legacy:
+            for key, months in season_defs:
+                fallback = float(defaults[section][key]["value"])
+                p = deepcopy(defaults[section][key])
+                p["value"] = _avg_month_values(sec, legacy_prefix, months, fallback)
+                if any(
+                    isinstance(sec.get(f"{legacy_prefix}{m}"), dict)
+                    and sec[f"{legacy_prefix}{m}"].get("source") == USER_INPUT
+                    for m in months
+                ):
+                    p["source"] = USER_INPUT
+                sec[key] = p
+        elif not has_new:
+            for key, _months in season_defs:
+                sec[key] = deepcopy(defaults[section][key])
+
+        for i in range(1, 13):
+            sec.pop(f"{legacy_prefix}{i}", None)
+            sec.pop(f"month_{i}", None)
+            sec.pop(f"seasonal_{i}", None)
 
 
 def has_default_assumptions(config: dict) -> bool:

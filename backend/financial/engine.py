@@ -34,6 +34,35 @@ def annual_opex(config: dict) -> dict[str, float]:
     return {"solar_opex": solar, "wind_opex": wind, "bess_opex": bess, "total_opex": solar + wind + bess}
 
 
+def additional_annual_costs(config: dict) -> dict[str, Any]:
+    """User-defined extra annual cost line items from financial.additional_costs."""
+    raw = []
+    try:
+        p = config.get("financial", {}).get("additional_costs")
+        if isinstance(p, dict):
+            raw = p.get("value") or []
+        elif isinstance(p, list):
+            raw = p
+    except Exception:
+        raw = []
+    items: list[dict[str, Any]] = []
+    total = 0.0
+    if isinstance(raw, list):
+        for row in raw:
+            if not isinstance(row, dict):
+                continue
+            label = str(row.get("label") or row.get("name") or "").strip() or "Additional cost"
+            try:
+                amount = float(row.get("amount_inr_per_year", row.get("amount", 0.0)) or 0.0)
+            except Exception:
+                amount = 0.0
+            if amount == 0.0 and not str(row.get("label") or "").strip():
+                continue
+            items.append({"label": label, "amount_inr_per_year": amount})
+            total += amount
+    return {"items": items, "total_inr": total}
+
+
 def annual_energy_charges(config: dict, kpis: dict, dispatch_tariff: np.ndarray, grid_mw: np.ndarray) -> dict[str, float]:
     structure = str(v(config, "commercial.structure"))
     grid_cost = float(np.sum(grid_mw * dispatch_tariff) * 1000.0)  # MW * ₹/kWh * 1000 = ₹
@@ -42,17 +71,20 @@ def annual_energy_charges(config: dict, kpis: dict, dispatch_tariff: np.ndarray,
 
     solar_mwh = float(kpis["annual_solar_mwh"])
     wind_mwh = float(kpis["annual_wind_mwh"])
+    bess_discharge_mwh = float(kpis.get("bess_discharge_mwh", 0.0) or 0.0)
     re_served = float(kpis["re_serving_load_mwh"])
     loss = float(v(config, "grid.loss_pct")) / 100.0
 
     tx = float(v(config, "grid.transmission_inr_per_kwh"))
     wh = float(v(config, "grid.wheeling_inr_per_kwh"))
-    bank = float(v(config, "grid.banking_inr_per_kwh")) if bool(v(config, "grid.banking_enabled")) else 0.0
     other = float(v(config, "grid.other_charges_inr_per_kwh"))
 
     re_energy_cost = 0.0
     network_on_re = 0.0
     network_on_grid = 0.0
+    network_solar = 0.0
+    network_wind = 0.0
+    network_bess = 0.0
 
     if structure == "DISCOM":
         re_energy_cost = 0.0
@@ -70,8 +102,45 @@ def annual_energy_charges(config: dict, kpis: dict, dispatch_tariff: np.ndarray,
                 + wind_mwh * 1000.0 * float(v(config, "wind.energy_cost_inr_per_kwh"))
             )
 
-    if bool(v(config, "commercial.apply_network_charges_to_re")) and structure != "DISCOM":
-        network_on_re = re_served * 1000.0 * (tx + wh + bank + other)
+    if structure != "DISCOM":
+        if bool(v(config, "commercial.apply_network_charges_to_solar")):
+            s_bank = (
+                float(v(config, "commercial.solar_banking_inr_per_kwh"))
+                if bool(v(config, "commercial.solar_banking_enabled"))
+                else 0.0
+            )
+            network_solar = solar_mwh * 1000.0 * (
+                float(v(config, "commercial.solar_transmission_inr_per_kwh"))
+                + float(v(config, "commercial.solar_wheeling_inr_per_kwh"))
+                + s_bank
+                + float(v(config, "commercial.solar_other_charges_inr_per_kwh"))
+            )
+        if bool(v(config, "commercial.apply_network_charges_to_wind")):
+            w_bank = (
+                float(v(config, "commercial.wind_banking_inr_per_kwh"))
+                if bool(v(config, "commercial.wind_banking_enabled"))
+                else 0.0
+            )
+            network_wind = wind_mwh * 1000.0 * (
+                float(v(config, "commercial.wind_transmission_inr_per_kwh"))
+                + float(v(config, "commercial.wind_wheeling_inr_per_kwh"))
+                + w_bank
+                + float(v(config, "commercial.wind_other_charges_inr_per_kwh"))
+            )
+        if bool(v(config, "commercial.apply_network_charges_to_bess")):
+            b_bank = (
+                float(v(config, "commercial.bess_banking_inr_per_kwh"))
+                if bool(v(config, "commercial.bess_banking_enabled"))
+                else 0.0
+            )
+            network_bess = bess_discharge_mwh * 1000.0 * (
+                float(v(config, "commercial.bess_transmission_inr_per_kwh"))
+                + float(v(config, "commercial.bess_wheeling_inr_per_kwh"))
+                + b_bank
+                + float(v(config, "commercial.bess_other_charges_inr_per_kwh"))
+            )
+        network_on_re = network_solar + network_wind + network_bess
+
     if bool(v(config, "commercial.apply_network_charges_to_grid")):
         network_on_grid = float(kpis["grid_mwh"]) * 1000.0 * (tx + wh + other)
 
@@ -80,6 +149,9 @@ def annual_energy_charges(config: dict, kpis: dict, dispatch_tariff: np.ndarray,
         "demand_charge_inr": demand,
         "fixed_charge_inr": fixed,
         "re_energy_cost_inr": re_energy_cost,
+        "network_solar_inr": network_solar,
+        "network_wind_inr": network_wind,
+        "network_bess_inr": network_bess,
         "network_re_inr": network_on_re,
         "network_grid_inr": network_on_grid,
         "energy_and_network_inr": grid_cost + demand + fixed + re_energy_cost + network_on_re + network_on_grid,
@@ -115,11 +187,14 @@ def evaluate_financial(config: dict, kpis: dict, compliance: dict, dispatch) -> 
         opex = {"solar_opex": 0.0, "wind_opex": 0.0, "bess_opex": 0.0, "total_opex": 0.0}
 
     compliance_cost = float(compliance["total_compliance_cost_inr"])
+    extra = additional_annual_costs(config)
+    extra_total = float(extra["total_inr"])
     total_annual = (
         energy["energy_and_network_inr"]
         + opex["total_opex"]
         + ann["total_ann"]
         + compliance_cost
+        + extra_total
     )
     load_kwh = float(kpis["annual_load_mwh"]) * 1000.0
     cost_per_kwh = total_annual / load_kwh if load_kwh > 0 else 0.0
@@ -145,10 +220,11 @@ def evaluate_financial(config: dict, kpis: dict, compliance: dict, dispatch) -> 
         )
         opex_y = opex["total_opex"] * ((1 + inflation) ** (y - 1))
         comp_y = compliance_cost * ((1 + inflation) ** (y - 1))
+        extra_y = extra_total * ((1 + inflation) ** (y - 1))
         repl = 0.0
         if include_capex and y == int(v(config, "bess.replacement_year")):
             repl = caps["bess_capex"] * float(v(config, "bess.replacement_cost_pct")) / 100.0
-        cost_y = grid_part + demand_fixed + re_part + opex_y + comp_y + repl
+        cost_y = grid_part + demand_fixed + re_part + opex_y + comp_y + extra_y + repl
         residual = 0.0
         if y == life and include_capex:
             residual = -capex0 * residual_pct  # credit
@@ -173,6 +249,7 @@ def evaluate_financial(config: dict, kpis: dict, compliance: dict, dispatch) -> 
         "transmission_wheeling_inr": energy["network_re_inr"] + energy["network_grid_inr"],
         "compliance_inr": compliance_cost,
         "opex_re_inr": opex["solar_opex"] + opex["wind_opex"],
+        "additional_costs_inr": extra_total,
     }
 
     return {
@@ -185,6 +262,8 @@ def evaluate_financial(config: dict, kpis: dict, compliance: dict, dispatch) -> 
         "energy_detail": energy,
         "annualized_capex": ann,
         "compliance_cost_inr": compliance_cost,
+        "additional_costs_inr": extra_total,
+        "additional_cost_items": extra["items"],
         "cost_breakdown": breakdown,
         "cashflows_inr": cashflows,
         "annual_costs_inr": annual_costs,

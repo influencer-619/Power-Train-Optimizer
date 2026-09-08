@@ -20,6 +20,7 @@ from config.defaults import (
     flatten_assumptions,
     get_default_config,
     has_default_assumptions,
+    merge_missing_defaults,
     recompute_calculated,
 )
 
@@ -57,6 +58,9 @@ def get_project(project_id: int) -> dict:
             raise KeyError(f"Project {project_id} not found")
         inp = session.execute(select(m.ProjectInput).where(m.ProjectInput.project_id == project_id)).scalar_one()
         config = json.loads(inp.payload_json)
+        config = merge_missing_defaults(config)
+        recompute_calculated(config)
+        purge_legacy_architecture_scenarios(session, project_id)
         return {
             "id": p.id,
             "name": p.name,
@@ -123,7 +127,7 @@ def update_inputs(project_id: int, config: dict) -> dict:
         p = session.get(m.Project, project_id)
         if not p:
             raise KeyError(f"Project {project_id} not found")
-        cfg = recompute_calculated(deepcopy(config))
+        cfg = recompute_calculated(merge_missing_defaults(deepcopy(config)))
         inp = session.execute(select(m.ProjectInput).where(m.ProjectInput.project_id == project_id)).scalar_one()
         inp.payload_json = json.dumps(cfg)
         inp.input_version += 1
@@ -165,9 +169,33 @@ def delete_project(project_id: int) -> None:
         session.close()
 
 
+LEGACY_ARCHITECTURE_SCENARIO_NAMES = frozenset(
+    {
+        "DISCOM – 90% RE",
+        "CAPTIVE – 95% RE",
+        "HYBRID – 95% RE / 99% CFE",
+        "OPEN ACCESS – 99% RE / 100% CFE",
+    }
+)
+
+
+def purge_legacy_architecture_scenarios(session, project_id: int) -> int:
+    """Remove old architecture-named scenario presets (architecture lives in Project Setup now)."""
+    rows = session.execute(select(m.Scenario).where(m.Scenario.project_id == project_id)).scalars().all()
+    removed = 0
+    for r in rows:
+        if r.name in LEGACY_ARCHITECTURE_SCENARIO_NAMES:
+            session.delete(r)
+            removed += 1
+    if removed:
+        session.commit()
+    return removed
+
+
 def list_scenarios(project_id: int) -> list[dict]:
     session = SessionLocal()
     try:
+        purge_legacy_architecture_scenarios(session, project_id)
         rows = session.execute(select(m.Scenario).where(m.Scenario.project_id == project_id)).scalars().all()
         return [
             {"id": r.id, "project_id": r.project_id, "name": r.name, "updated_at": r.updated_at.isoformat()}

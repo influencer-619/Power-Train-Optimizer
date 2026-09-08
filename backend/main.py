@@ -92,11 +92,21 @@ def create_app(init_db: bool = True) -> FastAPI:
         return {"ok": True}
 
     @app.post("/api/shutdown")
-    def shutdown():
+    def shutdown(body: dict[str, Any] | None = Body(default=None)):
+        """Stop the process. Optional delay_sec lets a page refresh cancel via heartbeat."""
         fn = getattr(app.state, "launcher_request_shutdown", None)
+        delay = 0.0
+        if isinstance(body, dict):
+            try:
+                delay = float(body.get("delay_sec", 0) or 0)
+            except (TypeError, ValueError):
+                delay = 0.0
         if callable(fn):
-            fn()
-        return {"ok": True, "message": "Shutting down"}
+            try:
+                fn(delay)
+            except TypeError:
+                fn()
+        return {"ok": True, "message": "Shutting down", "delay_sec": delay}
 
     @app.get("/api/defaults")
     def defaults():
@@ -292,9 +302,18 @@ def create_app(init_db: bool = True) -> FastAPI:
 
     @app.post("/api/projects/restore")
     async def restore(file: UploadFile = File(...)):
-        dest = data_dir() / "exports" / (file.filename or "restore.pto.zip")
+        name = file.filename or "restore.pto.zip"
+        if not name.lower().endswith(".zip"):
+            raise HTTPException(400, "Select a project backup file (.pto.zip)")
+        dest = data_dir() / "exports" / Path(name).name
+        dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(await file.read())
-        return ps.restore_project(dest)
+        try:
+            return ps.restore_project(dest)
+        except KeyError as e:
+            raise HTTPException(400, f"Invalid project file: {e}") from e
+        except Exception as e:
+            raise HTTPException(400, f"Could not open project file: {e}") from e
 
     @app.get("/api/settings")
     def settings():

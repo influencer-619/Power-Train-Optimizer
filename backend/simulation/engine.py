@@ -14,7 +14,7 @@ from backend.simulation.energy_ledger import build_energy_ledger
 from backend.simulation.fingerprint import config_fingerprint
 from backend.simulation.profiles import generate_load, generate_solar, generate_wind
 from backend.simulation.validation import validate_config, validate_dispatch
-from config.defaults import recompute_calculated, v
+from config.defaults import merge_missing_defaults, recompute_calculated, v
 
 
 @dataclass
@@ -30,19 +30,45 @@ class SimulationBundle:
     config_hash: str | None = None
 
 
+def _flag(config: dict, dotted: str, default: bool = True) -> bool:
+    try:
+        return bool(v(config, dotted))
+    except Exception:
+        return default
+
+
+def apply_architecture_asset_flags(config: dict) -> dict:
+    """Zero capacities for assets not included in the selected architecture mix."""
+    structure = str(v(config, "commercial.structure"))
+    if structure == "DISCOM":
+        config["commercial"]["include_discom"]["value"] = True
+        config["commercial"]["include_solar"]["value"] = False
+        config["commercial"]["include_wind"]["value"] = False
+        config["commercial"]["include_bess"]["value"] = False
+    elif structure == "CAPTIVE":
+        # Captive mix is Solar / Wind / BESS only (no DISCOM option)
+        config["commercial"]["include_discom"]["value"] = False
+
+    if structure == "DISCOM" or not _flag(config, "commercial.include_solar", True):
+        config["solar"]["capacity_mw"]["value"] = 0.0
+    if structure == "DISCOM" or not _flag(config, "commercial.include_wind", True):
+        config["wind"]["capacity_mw"]["value"] = 0.0
+    if structure == "DISCOM" or not _flag(config, "commercial.include_bess", True):
+        config["bess"]["power_mw"]["value"] = 0.0
+        config["bess"]["energy_mwh"]["value"] = 0.0
+        config["bess"]["max_charge_mw"]["value"] = 0.0
+        config["bess"]["max_discharge_mw"]["value"] = 0.0
+    if not _flag(config, "commercial.include_discom", True):
+        config["grid"]["max_import_mw"]["value"] = 0.0
+    return config
+
+
 def _apply_structure_capacities(config: dict, structure: str | None = None) -> dict:
     cfg = deepcopy(config)
     recompute_calculated(cfg)
     structure = structure or str(v(cfg, "commercial.structure"))
     cfg["commercial"]["structure"]["value"] = structure
-    if structure == "DISCOM":
-        cfg["solar"]["capacity_mw"]["value"] = 0.0
-        cfg["wind"]["capacity_mw"]["value"] = 0.0
-        cfg["bess"]["power_mw"]["value"] = 0.0
-        cfg["bess"]["energy_mwh"]["value"] = 0.0
-        cfg["bess"]["max_charge_mw"]["value"] = 0.0
-        cfg["bess"]["max_discharge_mw"]["value"] = 0.0
-    return cfg
+    return apply_architecture_asset_flags(cfg)
 
 
 def _capacity_overrides(config: dict, overrides: dict | None) -> dict:
@@ -187,6 +213,7 @@ def run_simulation(
 ) -> SimulationBundle:
     cfg = _apply_structure_capacities(config, structure)
     cfg = _capacity_overrides(cfg, capacity_overrides)
+    cfg = merge_missing_defaults(cfg)
     recompute_calculated(cfg)
 
     if not skip_validation:

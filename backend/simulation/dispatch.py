@@ -590,6 +590,72 @@ def run_dispatch(
     **overrides,
 ) -> DispatchResult:
     mode = str(v(config, "optimization.dispatch_mode"))
+    solar_full = np.asarray(solar_mw, dtype=float).copy()
+    wind_full = np.asarray(wind_mw, dtype=float).copy()
+    solar_avail, wind_avail, force_s, force_w = _apply_input_re_curtailment(config, solar_full, wind_full)
+
     if mode == "LP Dispatch":
-        return lp_dispatch(config, load_mw, solar_mw, wind_mw, hod, **overrides)
-    return rule_based_dispatch(config, load_mw, solar_mw, wind_mw, hod, **overrides)
+        d = lp_dispatch(config, load_mw, solar_avail, wind_avail, hod, **overrides)
+    else:
+        d = rule_based_dispatch(config, load_mw, solar_avail, wind_avail, hod, **overrides)
+
+    # Restore full RE generation on the result and add forced curtailment to totals
+    d.solar_mw = solar_full
+    d.wind_mw = wind_full
+    d.curtailment_mw = np.asarray(d.curtailment_mw, dtype=float) + force_s + force_w
+    if hasattr(d, "solar_curtailment_mw") and d.solar_curtailment_mw is not None and len(d.solar_curtailment_mw):
+        d.solar_curtailment_mw = np.asarray(d.solar_curtailment_mw, dtype=float) + force_s
+    if hasattr(d, "wind_curtailment_mw") and d.wind_curtailment_mw is not None and len(d.wind_curtailment_mw):
+        d.wind_curtailment_mw = np.asarray(d.wind_curtailment_mw, dtype=float) + force_w
+    d.meta = dict(d.meta or {})
+    d.meta["input_re_curtailment_pct"] = _input_re_curtailment_pct(config) * 100.0
+    d.meta["input_re_curtailment_scope"] = _input_re_curtailment_scope(config)
+    d.meta["forced_curtailment_mwh"] = float(force_s.sum() + force_w.sum())
+    return d
+
+
+def _input_re_curtailment_pct(config: dict) -> float:
+    try:
+        pct = float(v(config, "general.re_curtailment_pct")) / 100.0
+    except Exception:
+        pct = 0.0
+    return float(np.clip(pct, 0.0, 1.0))
+
+
+def _input_re_curtailment_scope(config: dict) -> str:
+    try:
+        scope = str(v(config, "general.re_curtailment_scope")).strip()
+    except Exception:
+        scope = "Solar + Wind"
+    if scope not in ("Solar + Wind", "Solar only", "Wind only"):
+        return "Solar + Wind"
+    return scope
+
+
+def _apply_input_re_curtailment(
+    config: dict, solar_mw: np.ndarray, wind_mw: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Remove user-specified % of RE for the selected scope before load/BESS allocation."""
+    pct = _input_re_curtailment_pct(config)
+    z = np.zeros_like(solar_mw)
+    if pct <= 0:
+        return solar_mw, wind_mw, z, z
+
+    scope = _input_re_curtailment_scope(config)
+    if scope == "Solar only":
+        force_s = solar_mw * pct
+        force_w = z
+    elif scope == "Wind only":
+        force_s = z
+        force_w = wind_mw * pct
+    else:
+        # Solar + Wind: % of combined RE, split proportionally by hour
+        re = solar_mw + wind_mw
+        force = re * pct
+        with np.errstate(divide="ignore", invalid="ignore"):
+            s_share = np.where(re > 1e-12, solar_mw / re, 0.0)
+            w_share = np.where(re > 1e-12, wind_mw / re, 0.0)
+        force_s = force * s_share
+        force_w = force * w_share
+
+    return solar_mw - force_s, wind_mw - force_w, force_s, force_w
