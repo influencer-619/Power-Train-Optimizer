@@ -485,6 +485,46 @@ DEFAULT_CONFIG = {
             "Include BESS. Selectable for CAPTIVE, HYBRID and OPEN ACCESS. Off for DISCOM.",
             kind="boolean",
         ),
+        "mix_discom_pct": P(
+            25.0,
+            "%",
+            DEFAULT_ASSUMPTION,
+            "DISCOM/grid share of the architecture mix (HYBRID / OPEN ACCESS). "
+            "Selected assets’ mix % must sum to 100. Effective max import = grid.max_import_mw × this % / 100.",
+            minimum=0,
+            maximum=100,
+            step=1,
+        ),
+        "mix_solar_pct": P(
+            35.0,
+            "%",
+            DEFAULT_ASSUMPTION,
+            "Solar share of the architecture mix (CAPTIVE / HYBRID / OPEN ACCESS). "
+            "Selected assets’ mix % must sum to 100. Effective solar MW = solar.capacity_mw × this % / 100.",
+            minimum=0,
+            maximum=100,
+            step=1,
+        ),
+        "mix_wind_pct": P(
+            25.0,
+            "%",
+            DEFAULT_ASSUMPTION,
+            "Wind share of the architecture mix (CAPTIVE / HYBRID / OPEN ACCESS). "
+            "Selected assets’ mix % must sum to 100. Effective wind MW = wind.capacity_mw × this % / 100.",
+            minimum=0,
+            maximum=100,
+            step=1,
+        ),
+        "mix_bess_pct": P(
+            15.0,
+            "%",
+            DEFAULT_ASSUMPTION,
+            "BESS share of the architecture mix (CAPTIVE / HYBRID / OPEN ACCESS). "
+            "Selected assets’ mix % must sum to 100. Effective BESS MW/MWh = configured × this % / 100.",
+            minimum=0,
+            maximum=100,
+            step=1,
+        ),
         "discom_name": P("MSEDCL", "", CONCEPT_NOTE, "DISCOM counterparty name referenced in the concept note DISCOM structure.", kind="text"),
         "captive_ownership_pct": P(26.0, "%", DEFAULT_ASSUMPTION, "Captive ownership share. Not a legal qualification test."),
         "captive_allocation_pct": P(100.0, "%", DEFAULT_ASSUMPTION, "Share of RE project output allocated to this data centre."),
@@ -828,6 +868,73 @@ _OBSOLETE_BESS_KEYS = (
 )
 
 
+_MIX_PCT_BY_INCLUDE = {
+    "include_discom": "mix_discom_pct",
+    "include_solar": "mix_solar_pct",
+    "include_wind": "mix_wind_pct",
+    "include_bess": "mix_bess_pct",
+}
+
+
+def active_architecture_mix_keys(config: dict) -> list[str]:
+    """Mix % keys that must sum to 100 for the current structure + include flags."""
+    commercial = config.get("commercial")
+    if not isinstance(commercial, dict):
+        return []
+    structure_p = commercial.get("structure")
+    structure = str(structure_p.get("value", "HYBRID")) if isinstance(structure_p, dict) else "HYBRID"
+    if structure == "DISCOM":
+        return []
+    if structure == "CAPTIVE":
+        flag_keys = ["include_solar", "include_wind", "include_bess"]
+    elif structure in ("HYBRID", "OPEN_ACCESS"):
+        flag_keys = ["include_discom", "include_solar", "include_wind", "include_bess"]
+    else:
+        return []
+
+    keys: list[str] = []
+    for flag in flag_keys:
+        p = commercial.get(flag)
+        on = True
+        if isinstance(p, dict) and "value" in p:
+            on = bool(p["value"])
+        if on:
+            keys.append(_MIX_PCT_BY_INCLUDE[flag])
+    return keys
+
+
+def ensure_architecture_mix_sums_to_100(config: dict) -> None:
+    """If selected Asset usage % do not sum to ~100, redistribute equally (old projects / structure changes)."""
+    commercial = config.get("commercial")
+    if not isinstance(commercial, dict):
+        return
+    keys = active_architecture_mix_keys(config)
+    if not keys:
+        return
+    total = 0.0
+    for key in keys:
+        p = commercial.get(key)
+        if isinstance(p, dict) and "value" in p:
+            try:
+                total += float(p["value"])
+            except (TypeError, ValueError):
+                pass
+    if abs(total - 100.0) <= 0.05:
+        return
+    n = len(keys)
+    share = round(100.0 / n, 4)
+    allocated = 0.0
+    for i, key in enumerate(keys):
+        p = commercial.get(key)
+        if not isinstance(p, dict) or "value" not in p:
+            continue
+        if i < n - 1:
+            p["value"] = share
+            allocated += share
+        else:
+            p["value"] = round(100.0 - allocated, 4)
+
+
 def _normalize_architecture_flags(config: dict) -> None:
     """Keep include_* flags consistent with commercial structure (UI + old projects)."""
     commercial = config.get("commercial")
@@ -874,6 +981,7 @@ def merge_missing_defaults(config: dict) -> dict:
     _seed_re_network_from_grid(config, newly_added)
     _seed_solar_wind_network_from_re(config, newly_added)
     _normalize_architecture_flags(config)
+    ensure_architecture_mix_sums_to_100(config)
     return config
 
 

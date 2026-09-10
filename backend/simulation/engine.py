@@ -38,7 +38,7 @@ def _flag(config: dict, dotted: str, default: bool = True) -> bool:
 
 
 def apply_architecture_asset_flags(config: dict) -> dict:
-    """Zero capacities for assets not included in the selected architecture mix."""
+    """Zero excluded assets, then scale included assets by architecture mix %."""
     structure = str(v(config, "commercial.structure"))
     if structure == "DISCOM":
         config["commercial"]["include_discom"]["value"] = True
@@ -58,7 +58,38 @@ def apply_architecture_asset_flags(config: dict) -> dict:
         config["bess"]["energy_mwh"]["value"] = 0.0
     if not _flag(config, "commercial.include_discom", True):
         config["grid"]["max_import_mw"]["value"] = 0.0
+
+    # Mix %: how much of each included asset's configured capacity is used
+    if structure != "DISCOM":
+        if float(config["solar"]["capacity_mw"]["value"]) > 0:
+            config["solar"]["capacity_mw"]["value"] = round(
+                float(config["solar"]["capacity_mw"]["value"]) * _mix_scale(config, "mix_solar_pct"),
+                6,
+            )
+        if float(config["wind"]["capacity_mw"]["value"]) > 0:
+            config["wind"]["capacity_mw"]["value"] = round(
+                float(config["wind"]["capacity_mw"]["value"]) * _mix_scale(config, "mix_wind_pct"),
+                6,
+            )
+        if float(config["bess"]["power_mw"]["value"]) > 0 or float(config["bess"]["energy_mwh"]["value"]) > 0:
+            scale_b = _mix_scale(config, "mix_bess_pct")
+            config["bess"]["power_mw"]["value"] = round(float(config["bess"]["power_mw"]["value"]) * scale_b, 6)
+            config["bess"]["energy_mwh"]["value"] = round(float(config["bess"]["energy_mwh"]["value"]) * scale_b, 6)
+        if structure in ("HYBRID", "OPEN_ACCESS") and float(config["grid"]["max_import_mw"]["value"]) > 0:
+            config["grid"]["max_import_mw"]["value"] = round(
+                float(config["grid"]["max_import_mw"]["value"]) * _mix_scale(config, "mix_discom_pct"),
+                6,
+            )
     return config
+
+
+def _mix_scale(config: dict, key: str) -> float:
+    """Return 0–1 scale from commercial.mix_*_pct (default 100%)."""
+    try:
+        pct = float(v(config, f"commercial.{key}"))
+    except Exception:
+        pct = 100.0
+    return max(0.0, min(100.0, pct)) / 100.0
 
 
 def _apply_structure_capacities(config: dict, structure: str | None = None) -> dict:

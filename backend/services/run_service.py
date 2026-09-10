@@ -77,7 +77,8 @@ def run_project_simulation(project_id: int, structure: str | None = None, scenar
     bundle = run_simulation(config, structure=structure, project_id=project_id)
     compliance = evaluate_compliance(bundle.config, bundle.kpis)
     financial = evaluate_financial(bundle.config, bundle.kpis, compliance, bundle.dispatch)
-    financial["incremental"] = incremental_vs_discom(financial, discom_fin)
+    disc = float(v(config, "financial.discount_rate_pct")) / 100.0
+    financial["incremental"] = incremental_vs_discom(financial, discom_fin, discount_rate=disc)
     financial["discom_baseline"] = {
         "label": "GRID-ONLY BASELINE (DISCOM)",
         "cost_per_kwh": discom_fin["cost_per_kwh"],
@@ -86,9 +87,6 @@ def run_project_simulation(project_id: int, structure: str | None = None, scenar
         "hourly_cfe_min_pct": discom.kpis["hourly_cfe_min_pct"],
         "reason": "Grid-only comparator — solar/wind/BESS forced to 0 MW.",
     }
-    disc = float(v(config, "financial.discount_rate_pct")) / 100.0
-    cfs = financial["incremental"]["cashflows_inr"]
-    financial["incremental"]["npv_inr"] = float(sum(cf / ((1 + disc) ** t) for t, cf in enumerate(cfs)))
     if bundle.commercial_structure != "DISCOM":
         financial["npv_inr"] = financial["incremental"]["npv_inr"]
         financial["npv_cr"] = financial["npv_inr"] / 1e7

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from backend.simulation.energy_ledger import build_energy_ledger
-from config.defaults import v
+from config.defaults import active_architecture_mix_keys, v
 
 
 def validate_config(config: dict) -> list[dict]:
@@ -41,10 +41,31 @@ def validate_config(config: dict) -> list[dict]:
         ("Initial SOC", "bess.initial_soc_pct"),
         ("Min SOC", "bess.min_soc_pct"),
         ("Max SOC", "bess.max_soc_pct"),
+        ("DISCOM mix %", "commercial.mix_discom_pct"),
+        ("Solar mix %", "commercial.mix_solar_pct"),
+        ("Wind mix %", "commercial.mix_wind_pct"),
+        ("BESS mix %", "commercial.mix_bess_pct"),
     ]:
-        x = float(v(config, path))
+        try:
+            x = float(v(config, path))
+        except Exception:
+            continue
         if x < 0 or x > 100:
             err(f"{label} must be within 0–100%.")
+
+    mix_keys = active_architecture_mix_keys(config)
+    if mix_keys:
+        mix_total = 0.0
+        for key in mix_keys:
+            try:
+                mix_total += float(v(config, f"commercial.{key}"))
+            except Exception:
+                pass
+        if abs(mix_total - 100.0) > 0.05:
+            err(
+                f"Asset usage % for selected assets must sum to 100 "
+                f"(currently {mix_total:.2f}%)."
+            )
 
     if float(v(config, "bess.min_soc_pct")) > float(v(config, "bess.max_soc_pct")):
         err("Minimum SOC must be <= Maximum SOC.")

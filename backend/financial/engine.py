@@ -281,8 +281,18 @@ def evaluate_financial(config: dict, kpis: dict, compliance: dict, dispatch) -> 
     }
 
 
-def incremental_vs_discom(project_fin: dict, discom_fin: dict) -> dict:
-    """Savings vs DISCOM as inflows; incremental CAPEX as outflow."""
+def incremental_vs_discom(
+    project_fin: dict,
+    discom_fin: dict,
+    discount_rate: float | None = None,
+) -> dict:
+    """Savings vs DISCOM as inflows; incremental CAPEX as outflow.
+
+    ``discount_rate`` is a fraction (e.g. 0.10 for 10%). Prefer the project's
+    ``financial.discount_rate_pct``; if omitted, falls back to 10% for callers
+    that have not yet passed a rate.
+    """
+    disc = 0.10 if discount_rate is None else float(discount_rate)
     inc_capex = float(project_fin["capex_inr"]) - float(discom_fin["capex_inr"])
     life = min(len(project_fin["annual_costs_inr"]), len(discom_fin["annual_costs_inr"]))
     cfs = [-inc_capex]
@@ -295,7 +305,7 @@ def incremental_vs_discom(project_fin: dict, discom_fin: dict) -> dict:
     inc_opex = float(project_fin.get("opex_detail", {}).get("total_opex") or 0.0) - float(
         discom_fin.get("opex_detail", {}).get("total_opex") or 0.0
     )
-    npv = float(sum(cf / ((1 + 0.10) ** t) for t, cf in enumerate(cfs)))
+    npv = float(sum(cf / ((1 + disc) ** t) for t, cf in enumerate(cfs)))
     return {
         "baseline_label": "DISCOM (grid-only)",
         "discom_annual_cost_inr": float(discom_fin.get("total_annual_cost_inr") or 0.0),
@@ -305,6 +315,7 @@ def incremental_vs_discom(project_fin: dict, discom_fin: dict) -> dict:
         "incremental_opex_inr_year1": inc_opex,
         "cashflows_inr": cfs,
         "npv_inr": npv,
+        "discount_rate": disc,
         "irr_pct": (lambda x: x * 100.0 if x is not None else None)(_irr(cfs)),
         "payback_years": _payback(cfs),
         "notes": (

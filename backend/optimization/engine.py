@@ -170,11 +170,8 @@ def evaluate_candidate(
     compliance = evaluate_compliance(bundle.config, bundle.kpis)
     fin = evaluate_financial(bundle.config, bundle.kpis, compliance, bundle.dispatch)
     if discom_cache is not None:
-        fin["incremental"] = incremental_vs_discom(fin, discom_cache)
-        # Recompute incremental NPV with project discount
         disc = float(v(base_config, "financial.discount_rate_pct")) / 100.0
-        cfs = fin["incremental"]["cashflows_inr"]
-        fin["incremental"]["npv_inr"] = float(sum(cf / ((1 + disc) ** t) for t, cf in enumerate(cfs)))
+        fin["incremental"] = incremental_vs_discom(fin, discom_cache, discount_rate=disc)
         fin["npv_inr"] = fin["incremental"]["npv_inr"]
         fin["npv_cr"] = fin["npv_inr"] / 1e7
         fin["irr_pct"] = fin["incremental"]["irr_pct"]
