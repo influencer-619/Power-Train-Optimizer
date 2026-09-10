@@ -390,16 +390,18 @@ DEFAULT_CONFIG = {
         ),
     },
     "bess": {
-        "power_mw": P(150.0, "MW", DEFAULT_ASSUMPTION, "BESS power rating (charge and discharge unless overridden).", minimum=0, step=1),
+        "power_mw": P(
+            150.0,
+            "MW",
+            DEFAULT_ASSUMPTION,
+            "BESS power rating — used as both maximum charge and discharge power.",
+            minimum=0,
+            step=1,
+        ),
         "energy_mwh": P(600.0, "MWh", DEFAULT_ASSUMPTION, "Usable energy capacity at 100% SOC window before min/max SOC.", minimum=0, step=1),
         "initial_soc_pct": P(50.0, "%", DEFAULT_ASSUMPTION, "Starting state of charge.", minimum=0, maximum=100, step=1),
         "min_soc_pct": P(10.0, "%", DEFAULT_ASSUMPTION, "Lower SOC bound.", minimum=0, maximum=100, step=1),
         "max_soc_pct": P(95.0, "%", DEFAULT_ASSUMPTION, "Upper SOC bound.", minimum=0, maximum=100, step=1),
-        "charge_efficiency_pct": P(95.0, "%", DEFAULT_ASSUMPTION, "One-way charging efficiency.", minimum=1, maximum=100, step=0.1),
-        "discharge_efficiency_pct": P(95.0, "%", DEFAULT_ASSUMPTION, "One-way discharging efficiency.", minimum=1, maximum=100, step=0.1),
-        "round_trip_efficiency_pct": P(90.25, "%", CALCULATED, "charge_efficiency × discharge_efficiency.", editable=False),
-        "max_charge_mw": P(150.0, "MW", DEFAULT_ASSUMPTION, "Maximum charge power. Defaults to power rating."),
-        "max_discharge_mw": P(150.0, "MW", DEFAULT_ASSUMPTION, "Maximum discharge power. Defaults to power rating."),
         "calendar_degradation_pct": P(2.0, "%/yr", DEFAULT_ASSUMPTION, "Calendar fade used in multi-year energy availability."),
         "cycle_degradation_pct": P(0.005, "%/cycle", DEFAULT_ASSUMPTION, "Throughput fade per equivalent full cycle."),
         "capex_inr_per_mw": P(5_000_000.0, "₹/MW", DEFAULT_ASSUMPTION, "Power-side BESS CAPEX."),
@@ -813,11 +815,17 @@ def recompute_calculated(config: dict) -> dict:
     peak = v(config, "load.peak_load_mw")
     lf = v(config, "load.load_factor_pct") / 100.0
     config["load"]["base_load_mw"]["value"] = round(peak * lf, 6)
-    ce = v(config, "bess.charge_efficiency_pct") / 100.0
-    de = v(config, "bess.discharge_efficiency_pct") / 100.0
-    config["bess"]["round_trip_efficiency_pct"]["value"] = round(ce * de * 100.0, 4)
     config["grid"]["connection_voltage_kv"]["value"] = v(config, "data_center.grid_connection_kv")
     return config
+
+
+_OBSOLETE_BESS_KEYS = (
+    "charge_efficiency_pct",
+    "discharge_efficiency_pct",
+    "round_trip_efficiency_pct",
+    "max_charge_mw",
+    "max_discharge_mw",
+)
 
 
 def _normalize_architecture_flags(config: dict) -> None:
@@ -858,6 +866,11 @@ def merge_missing_defaults(config: dict) -> dict:
             if key not in config[section]:
                 config[section][key] = deepcopy(param)
                 newly_added.append((section, key))
+    # Drop retired BESS fields so they no longer appear in Setup / Assumptions
+    bess = config.get("bess")
+    if isinstance(bess, dict):
+        for key in _OBSOLETE_BESS_KEYS:
+            bess.pop(key, None)
     _seed_re_network_from_grid(config, newly_added)
     _seed_solar_wind_network_from_re(config, newly_added)
     _normalize_architecture_flags(config)

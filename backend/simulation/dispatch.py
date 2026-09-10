@@ -78,10 +78,11 @@ def rule_based_dispatch(
     soc_min_pct = float(v(config, "bess.min_soc_pct")) / 100.0
     soc_max_pct = float(v(config, "bess.max_soc_pct")) / 100.0
     soc0_pct = float(v(config, "bess.initial_soc_pct")) / 100.0
-    eta_c = float(v(config, "bess.charge_efficiency_pct")) / 100.0
-    eta_d = float(v(config, "bess.discharge_efficiency_pct")) / 100.0
-    max_c = min(float(v(config, "bess.max_charge_mw")), power)
-    max_d = min(float(v(config, "bess.max_discharge_mw")), power)
+    # Ideal inverter: charge/discharge at power_mw with 100% one-way efficiency
+    eta_c = 1.0
+    eta_d = 1.0
+    max_c = power
+    max_d = power
     allow_grid_charge = bool(v(config, "bess.allow_grid_charge"))
 
     if energy <= 0 or power <= 0:
@@ -317,8 +318,8 @@ def lp_dispatch(
     grid_cap = float(grid_cap_mw if grid_cap_mw is not None else v(config, "grid.max_import_mw"))
     avail = float(v(config, "grid.availability_pct")) / 100.0
     grid_cap_eff = grid_cap * avail
-    eta_c = float(v(config, "bess.charge_efficiency_pct")) / 100.0
-    eta_d = float(v(config, "bess.discharge_efficiency_pct")) / 100.0
+    eta_c = 1.0
+    eta_d = 1.0
     soc_min = float(v(config, "bess.min_soc_pct")) / 100.0 * energy
     soc_max = float(v(config, "bess.max_soc_pct")) / 100.0 * energy
     soc = float(np.clip(float(v(config, "bess.initial_soc_pct")) / 100.0 * energy, soc_min, soc_max))

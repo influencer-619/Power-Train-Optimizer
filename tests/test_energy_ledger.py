@@ -41,7 +41,7 @@ def test_energy_ledger_discom_grid_only():
 
 
 def test_energy_ledger_zero_bess():
-    cfg = _cfg(**{"bess.power_mw": 0.0, "bess.energy_mwh": 0.0, "bess.max_charge_mw": 0.0, "bess.max_discharge_mw": 0.0})
+    cfg = _cfg(**{"bess.power_mw": 0.0, "bess.energy_mwh": 0.0})
     bundle = run_simulation(cfg, structure="HYBRID")
     assert bundle.energy_ledger["energy_balance_ok"] is True
     assert bundle.kpis["bess_discharge_mwh"] == 0.0
@@ -81,5 +81,5 @@ def test_bess_duration_and_losses_reported():
     assert bundle.kpis["bess_duration_h"] == pytest.approx(
         bundle.kpis["bess_mwh"] / bundle.kpis["bess_mw"], rel=1e-6
     )
-    assert bundle.kpis["bess_losses_mwh"] >= 0.0
+    assert bundle.kpis["bess_losses_mwh"] == pytest.approx(0.0)
     assert "bess_utilization_definition" in bundle.kpis

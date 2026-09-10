@@ -31,10 +31,11 @@ Optional grid charging if enabled.
 ### SOC
 
 \[
-SOC_t = SOC_{t-1} + Charge_t \cdot \eta_c - \frac{Discharge_t}{\eta_d}
+SOC_t = SOC_{t-1} + Charge_t - Discharge_t
 \]
 
 subject to \(SOC_{min} \le SOC_t \le SOC_{max}\).
+Charge and discharge are each limited by `bess.power_mw`. Conversion efficiency is modelled as ideal (100%).
 
 ### Power balance
 

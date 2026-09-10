@@ -56,8 +56,6 @@ def apply_architecture_asset_flags(config: dict) -> dict:
     if structure == "DISCOM" or not _flag(config, "commercial.include_bess", True):
         config["bess"]["power_mw"]["value"] = 0.0
         config["bess"]["energy_mwh"]["value"] = 0.0
-        config["bess"]["max_charge_mw"]["value"] = 0.0
-        config["bess"]["max_discharge_mw"]["value"] = 0.0
     if not _flag(config, "commercial.include_discom", True):
         config["grid"]["max_import_mw"]["value"] = 0.0
     return config
@@ -80,10 +78,7 @@ def _capacity_overrides(config: dict, overrides: dict | None) -> dict:
     if "wind_mw" in overrides:
         cfg["wind"]["capacity_mw"]["value"] = float(overrides["wind_mw"])
     if "bess_mw" in overrides:
-        p = float(overrides["bess_mw"])
-        cfg["bess"]["power_mw"]["value"] = p
-        cfg["bess"]["max_charge_mw"]["value"] = p
-        cfg["bess"]["max_discharge_mw"]["value"] = p
+        cfg["bess"]["power_mw"]["value"] = float(overrides["bess_mw"])
     if "bess_mwh" in overrides:
         cfg["bess"]["energy_mwh"]["value"] = float(overrides["bess_mwh"])
     if "grid_mw" in overrides:
@@ -112,10 +107,9 @@ def summarize_dispatch(config: dict, d: DispatchResult) -> dict[str, Any]:
     util = min(100.0, cycles / 365.0 * 100.0) if bess_energy > 0 else 0.0
     duration_h = (bess_energy / bess_power) if bess_power > 0 else 0.0
 
-    eta_c = float(d.meta.get("eta_c") or float(v(config, "bess.charge_efficiency_pct")) / 100.0)
-    eta_d = float(d.meta.get("eta_d") or float(v(config, "bess.discharge_efficiency_pct")) / 100.0)
+    # Ideal BESS: conversion losses are zero (η_c = η_d = 1)
+    bess_losses = 0.0
     charge_total = float(d.charge_mw.sum())
-    bess_losses = charge_total * (1.0 - eta_c) + throughput * (1.0 / max(eta_d, 1e-9) - 1.0)
 
     solar_from_bess = float(getattr(d, "solar_from_bess_mw", np.zeros(0)).sum()) if len(getattr(d, "solar_from_bess_mw", [])) else 0.0
     wind_from_bess = float(getattr(d, "wind_from_bess_mw", np.zeros(0)).sum()) if len(getattr(d, "wind_from_bess_mw", [])) else 0.0

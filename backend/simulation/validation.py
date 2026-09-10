@@ -38,8 +38,6 @@ def validate_config(config: dict) -> list[dict]:
             err(f"{name} must be >= 0.")
 
     for label, path in [
-        ("Charge efficiency", "bess.charge_efficiency_pct"),
-        ("Discharge efficiency", "bess.discharge_efficiency_pct"),
         ("Initial SOC", "bess.initial_soc_pct"),
         ("Min SOC", "bess.min_soc_pct"),
         ("Max SOC", "bess.max_soc_pct"),

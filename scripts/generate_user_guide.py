@@ -131,7 +131,7 @@ def build():
         "Techno-Economic 8,760-Hour Power Architecture Tool\n"
         "for Data Centre · Solar · Wind · BESS · Grid\n"
         "Includes: portable EXE · LAN sharing · Save Project (.pto.zip) · architecture asset selection · "
-        "compact Indian number format · on-screen parameter help"
+        "simplified BESS · compact Indian number format · on-screen parameter help"
     )
     set_run_font(r, size=11)
     add_para(doc, "")
@@ -337,6 +337,12 @@ def build():
                 "Compliance location",
                 "Compliance targets and applicability are edited under Project Setup → Compliance (not a separate "
                 "Analysis nav item). Dashboard links back to that setup step.",
+            ],
+            [
+                "Simplified BESS inputs",
+                "Charge efficiency, Discharge efficiency, Max charge power and Max discharge power are removed. "
+                "BESS power (MW) is both the charge and discharge limit; conversion efficiency is ideal (100%). "
+                "BESS losses MWh = 0. SOC_t = SOC_(t−1) + Charge_t − Discharge_t within min/max SOC.",
             ],
             [
                 "On-screen parameter help",
@@ -632,7 +638,9 @@ def build():
         ),
         (
             "BESS",
-            "Direct editor for battery power/energy, SOC limits, efficiencies, degradation, CAPEX/OPEX and replacement.",
+            "Direct editor for battery power (MW) and energy (MWh), SOC window (initial/min/max), degradation, "
+            "CAPEX/OPEX, replacement and allow-grid-charge. Power rating is both max charge and max discharge; "
+            "charge/discharge efficiencies are not user inputs (modelled as 100%).",
         ),
         (
             "Grid",
@@ -842,7 +850,9 @@ def build():
         doc,
         "bess",
         "9.6 BESS",
-        "Physical battery model with SOC limits, one-way efficiencies, and renewable-origin tracking for ESO.",
+        "Physical battery model with power rating (caps both charge and discharge), energy capacity, SOC window, "
+        "and renewable-origin tracking for ESO. Conversion efficiency is ideal (100%) — charge/discharge efficiency "
+        "and separate max charge/discharge power inputs are not used.",
         rows,
     )
     section_params(
@@ -897,7 +907,7 @@ def build():
             ["CONCEPT_NOTE", "Stated in the Design Concept Note for Power Train Architecture. Still editable unless locked."],
             ["DEFAULT_ASSUMPTION", "Required to run the model but not a concept-note fact. Must be replaced with project data for investment use."],
             ["USER_INPUT", "You (or a loaded scenario / profile upload) have set this value."],
-            ["CALCULATED", "Derived automatically (e.g. base_load_mw, round-trip efficiency). Not directly editable."],
+            ["CALCULATED", "Derived automatically (e.g. base_load_mw). Not directly editable."],
         ],
     )
     add_para(
@@ -1474,13 +1484,20 @@ def build():
         doc,
         "Each hour t the engine follows fixed priorities (also shown as Optimization priority_1…5):",
     )
+    add_para(
+        doc,
+        "BESS modelling note: separate Charge efficiency, Discharge efficiency, Max charge power and Max discharge "
+        "power inputs are removed. Charge and discharge are each limited by bess.power_mw. Conversion is ideal "
+        "(η = 100%), so energy into storage equals energy out for a given throughput (aside from SOC window limits). "
+        "Older projects drop the retired fields automatically when opened.",
+    )
     add_numbered(
         doc,
         [
             "RE serves load first: DirectRE_t = min(Solar_t + Wind_t, Load_t). Solar/wind shares of DirectRE are proportional to their generation.",
-            "Excess RE charges BESS (if capacity and SOC headroom allow), limited by max charge power and charge efficiency η_c.",
+            "Excess RE charges BESS (if capacity and SOC headroom allow), limited by BESS power rating (η = 100%).",
             "Any RE still left is curtailed.",
-            "If load remains, BESS discharges (limited by max discharge, SOC above min, discharge efficiency η_d).",
+            "If load remains, BESS discharges (limited by power rating and SOC above min; η = 100%).",
             "Grid import serves any residual, ≤ max_import_mw × (availability_pct/100).",
             "If still short → Unserved_t > 0.",
             "Optional: if allow_grid_charge and load is fully met, residual grid headroom may charge BESS.",
@@ -1489,9 +1506,33 @@ def build():
     add_para(doc, "State of charge (MWh):", bold=True)
     add_para(
         doc,
-        "SOC_t = SOC_(t−1) + Charge_t × η_c − Discharge_t / η_d, "
+        "SOC_t = SOC_(t−1) + Charge_t − Discharge_t, "
         "with SOC_min = min_soc_pct/100 × energy_mwh and SOC_max = max_soc_pct/100 × energy_mwh. "
-        "Round-trip efficiency (CALCULATED) = charge_efficiency_pct × discharge_efficiency_pct / 100.",
+        "Charge and discharge power are both capped at bess.power_mw. Conversion efficiency is modelled as ideal (100%).",
+    )
+    add_para(doc, "User-editable BESS technical inputs (Setup → BESS):", bold=True)
+    add_table(
+        doc,
+        ["Parameter", "Role"],
+        [
+            ["power_mw", "Power rating — max charge MW and max discharge MW in every hour"],
+            ["energy_mwh", "Energy capacity used with SOC % limits"],
+            ["initial_soc_pct / min_soc_pct / max_soc_pct", "Starting SOC and operating window"],
+            ["calendar_degradation_pct / cycle_degradation_pct", "Multi-year fade (financial / availability framing)"],
+            ["capex / opex / life / replacement_*", "Economics of the battery"],
+            ["allow_grid_charge", "If true, grid may charge BESS after load is met"],
+        ],
+        col_widths=[2.2, 4.3],
+    )
+    add_para(doc, "Removed from BESS (no longer in UI or model inputs):", bold=True)
+    add_bullets(
+        doc,
+        [
+            "charge_efficiency_pct — was one-way charge efficiency; now fixed at 100%.",
+            "discharge_efficiency_pct — was one-way discharge efficiency; now fixed at 100%.",
+            "round_trip_efficiency_pct — was calculated from the two efficiencies; removed.",
+            "max_charge_mw / max_discharge_mw — replaced by power_mw for both directions.",
+        ],
     )
     add_para(doc, "Hourly AC power balance (validated):", bold=True)
     add_para(
@@ -1511,7 +1552,7 @@ def build():
         [
             "RE_serving_load_t = DirectRE_t + RE_origin_discharge_t  (MW in hour t → MWh for that hour).",
             "BESS stores separate origin buckets: solar-origin, wind-origin, grid-origin SOC.",
-            "Charge from solar/wind increases the matching RE bucket (× η_c); grid charge increases grid-origin.",
+            "Charge from solar/wind increases the matching RE bucket 1:1 (η = 100%); grid charge increases grid-origin.",
             "Discharge depletes origin buckets in proportion to their share of stored energy.",
             "Grid-origin discharge does NOT count toward RE_serving_load / CFE.",
             "re_origin_stored_share_pct ≈ Σ charge_from_RE / Σ total_charge × 100 (used in ESO checks).",
@@ -1569,7 +1610,7 @@ def build():
             ["BESS duration (h)", "energy_mwh / power_mw"],
             ["BESS cycles", "Σ Discharge_t / energy_mwh"],
             ["BESS utilization %", "min(100, cycles / 365 × 100) — vs 1 full cycle/day"],
-            ["BESS losses MWh", "Σ Charge×(1−η_c) + Σ Discharge×(1/η_d − 1)"],
+            ["BESS losses MWh", "0 (ideal conversion; η_c = η_d = 100%)"],
             ["Max grid import MW", "max(Grid_t) over the year (feeds demand charge)"],
         ],
     )
@@ -1904,7 +1945,7 @@ def build():
             ["Hourly CFE %", "Hourly carbon-free energy share of load"],
             ["CFE pass mode", "Rule used to Pass/Fail hourly CFE (all hours / mean / share of hours)"],
             ["CFE analytics", "Deficit streak, % hours ≥ target, duration-curve stats attached to KPIs"],
-            ["BESS", "Battery Energy Storage System"],
+            ["BESS", "Battery Energy Storage System — power_mw caps charge & discharge; ideal 100% conversion"],
             ["SOC", "State of charge (MWh or %)"],
             ["Curtailment", "Renewable energy that could not serve load or charge BESS"],
             ["Energy Ledger", "Audited annual/monthly energy flow table with reconciliation"],
@@ -1949,11 +1990,12 @@ def build():
         doc,
         "This User Guide was regenerated to match the current product: Create New / Open Existing (.pto.zip) / "
         "Save Project, architecture asset selection, per-asset network charges, Additional costs, Compliance only "
-        "in Project Setup, Chrome-tab launch, Quit App and tab-close shutdown of background processes, "
-        "single-instance reuse, LAN sharing, on-screen parameter help, compact Lakh/Cr formatting, "
-        "8760 Time window controls, and Section 17A detailed calculations "
-        "(profiles, dispatch, RE/CFE, compliance costs, CAPEX/OPEX/CRF, ₹/kWh, NPV/IRR/payback, "
-        "incremental vs DISCOM, ledger identities, optimization ranking).",
+        "in Project Setup, simplified BESS inputs (power_mw caps charge & discharge; ideal 100% efficiency; "
+        "removed charge/discharge efficiency and max charge/discharge power), Chrome-tab launch, "
+        "Quit App and tab-close shutdown of background processes, single-instance reuse, LAN sharing, "
+        "on-screen parameter help, compact Lakh/Cr formatting, 8760 Time window controls, and Section 17A "
+        "detailed calculations (profiles, dispatch, RE/CFE, compliance costs, CAPEX/OPEX/CRF, ₹/kWh, "
+        "NPV/IRR/payback, incremental vs DISCOM, ledger identities, optimization ranking).",
     )
     add_para(doc, DISCLAIMER, italic=True, size=10)
 

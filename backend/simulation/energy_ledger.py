@@ -223,7 +223,7 @@ def build_energy_ledger(d: DispatchResult) -> dict[str, Any]:
                 "equivalent full cycles per year as % of 1 cycle/day."
             ),
             "bess_losses_mwh": (
-                "Σ charge×(1−η_c) + Σ discharge×(1/η_d − 1) — round-trip conversion losses."
+                "Conversion losses are modelled as zero (ideal charge/discharge at BESS power rating)."
             ),
             "ac_balance": (
                 "solar+wind+discharge+grid+unserved = load+charge+curtail (hourly MW identity)."
