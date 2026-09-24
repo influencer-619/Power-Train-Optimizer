@@ -30,6 +30,9 @@ def test_cfe_analytics_attached_and_consistent():
     assert ca["min_hourly_cfe_pct"] == pytest.approx(bundle.kpis["hourly_cfe_min_pct"], abs=1e-6)
     assert 0 <= ca["pct_hours_ge_target"] <= 100
     assert len(ca["duration_curve"]) == 101
+    assert "performance" in ca
+    assert ca["performance"]["annual"]["cfe_pct"] == pytest.approx(ca["annual_cfe_pct"], abs=1e-6)
+    assert "Min(Hourly Load" in ca["formula"]
 
 
 def test_feasibility_discom_not_recommended_when_targets_miss():
@@ -38,12 +41,32 @@ def test_feasibility_discom_not_recommended_when_targets_miss():
     feas = evaluate_feasibility(bundle.config, bundle.kpis, comp, bundle.validation)
     assert feas["status"] == "NOT FEASIBLE"
     assert feas["can_recommend"] is False
+    # Plant-profile unserved must not be the binding issue on buyer path
+    assert not any(b.get("code") == "UNSERVED" for b in (feas.get("binding_constraints") or []))
+
+
+def test_feasibility_captive_ignores_plant_unserved_when_cfe_re_pass():
+    """CAPTIVE: commercial unserved=0; feasibility does not bind on UNSERVED even if dispatch shortfall."""
+    cfg = _cfg(
+        **{
+            "compliance.annual_re_target_pct": 10.0,
+            "compliance.hourly_cfe_target_pct": 5.0,
+            "commercial.structure": "CAPTIVE",
+        }
+    )
+    bundle = run_simulation(cfg, structure="CAPTIVE")
+    assert bundle.kpis["unserved_mwh"] == 0.0
+    assert bundle.kpis.get("dispatch_unserved_mwh", 0) >= 0.0
+    comp = evaluate_compliance(bundle.config, bundle.kpis)
+    feas = evaluate_feasibility(bundle.config, bundle.kpis, comp, bundle.validation)
+    assert not any(b.get("code") == "UNSERVED" for b in (feas.get("binding_constraints") or []))
+    if feas["status"] == "FEASIBLE":
+        assert feas["can_recommend"] is True
 
 
 def test_feasibility_hybrid_can_recommend_when_targets_pass():
-    # Relax targets so default plant can pass
-    cfg = _cfg(**{"compliance.annual_re_target_pct": 50.0, "compliance.hourly_cfe_target_pct": 50.0})
-    set_param(cfg, "compliance.cfe_pass_mode", "Mean hourly CFE >= target", as_user=True)
+    # Relax targets so availability-based CFE/RE can pass on default Hybrid
+    cfg = _cfg(**{"compliance.annual_re_target_pct": 10.0, "compliance.hourly_cfe_target_pct": 5.0})
     bundle = run_simulation(cfg, structure="HYBRID")
     comp = evaluate_compliance(bundle.config, bundle.kpis)
     feas = evaluate_feasibility(bundle.config, bundle.kpis, comp, bundle.validation)

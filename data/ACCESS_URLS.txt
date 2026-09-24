@@ -1,0 +1,12 @@
+PowerTrain Optimizer — access addresses
+========================================
+
+This PC (browser on the same laptop):  http://127.0.0.1:8765/
+
+Other laptops on the same Wi‑Fi / office network:
+  http://10.91.60.101:8765/
+
+Keep this app open while others are using it.
+Quit App or closing all browser tabs stops the server.
+Windows Firewall: allow Private network access if prompted.
+

@@ -1,86 +1,125 @@
-# Model Methodology
+# Model Methodology (Commercial buyer path)
 
-## Horizon
+PowerTrain Optimizer prices **data-centre power procurement**:
 
-Normal year: **8,760** hours. Leap-year support is reserved for **8,784** hours (not enabled by default).
+1. **Bill** — Architecture mix % × DISCOM / Solar / Wind / Storage tariff stacks  
+2. **Hourly CFE and charts** — TOD / availability shapes (solar not available at night; wind and BESS can be)
 
-## Load
+It is **not** a generation-plant investment or plant-sizing CAPEX model.
 
-Parameterized shape (flat / diurnal / weekday-weekend / seasonal / custom) scaled so mean ≈ peak × load factor, compressed if needed so max ≤ peak.
+---
 
-## Solar
+## 1. Horizon and load
 
-Daylight-only Gaussian diurnal shape × seasonal factors × deterministic noise, scaled to target capacity factor and clipped to capacity. Night = 0.
+- **Study period:** Start month to end month × calendar year. Model hours = days in range × 24 (non-leap full year = **8,760**).
+- **Peak load:** Peak_MW = IT_load_MW × PUE (calculated).
+- **Load shape:** Seasonal TOD (Summer / Rainy / Winter × day/night × weekday/weekend), then scaled to each load-factor scenario (S1-S4). Headline KPIs use **S1**.
+- **Annual load (MWh):** Sum of hourly load over the study.
+- Load TOD shapes **demand only**. Solar night availability comes from the **solar** profile (sunrise-sunset), not from load TOD alone.
 
-## Wind
+---
 
-Monthly factors × mild diurnal × deterministic noise, scaled to CF, clipped to capacity.
+## 2. Architecture mix (bill) vs hourly availability (CFE)
 
-## Dispatch (rule-based default)
+For each architecture, selected assets mix % **sum to 100%**:
 
-Each hour:
+| Architecture | Assets |
+|--------------|--------|
+| Captive | Solar + Wind + BESS (no DISCOM) |
+| Hybrid | DISCOM + Solar + Wind + BESS |
+| DISCOM baseline | Grid 100% (savings / NPV comparator only) |
 
-1. Renewable serves load  
-2. Excess RE charges BESS (SOC / power limits, charge efficiency)  
-3. Remaining RE curtailed  
-4. BESS discharges on deficit (SOC / power limits, discharge efficiency)  
-5. Grid serves residual (≤ available import capacity)
+### 2.1 Bill (Architecture %)
 
-Optional grid charging if enabled.
+Blended ₹/kWh =
 
-### SOC
+`Discom × (G/100) + Solar × (S/100) + Wind × (W/100) + Storage_tariff × (B/100)`
 
-\[
-SOC_t = SOC_{t-1} + Charge_t - Discharge_t
-\]
+- DISCOM / Solar / Wind rates = sum of volumetric charge-stack lines.
+- BESS = single **Storage tariff** (`excel_bess_ppa_inr_per_kwh`).
+- **TARGET_POWER_PCT** and **SIMULATED_ENERGY_SHARE** both use Architecture contracted mix % for the bill (Target = Simulated on pricing).
 
-subject to \(SOC_{min} \le SOC_t \le SOC_{max}\).
-Charge and discharge are each limited by `bess.power_mw`. Conversion efficiency is modelled as ideal (100%).
+### 2.2 Hourly delivery (shapes scaled to annual contracts)
 
-### Power balance
+Annual energy contracts:
 
-\[
-Solar_t + Wind_t + Discharge_t + Grid_t = Load_t + Charge_t + Curtailment_t (+ Unserved_t)
-\]
+- Sum Solar_t = Load_annual × Solar%/100  
+- Sum Wind_t = Load_annual × Wind%/100  
 
-Validated each hour within tolerance.
+Hourly shapes:
 
-## Renewable-origin tracking
+- Taken from synthetic CF curves (solar: zero outside sunrise-sunset; wind: seasonal/diurnal) or PROJECT DATA.
+- Scaled so annual MWh matches the contract. **Solar remains ~0 at night.**
+- If BESS mix > 0: derived storage power ~ Peak × BESS%/100 and energy ~ max(4h × power, contracted BESS MWh / days) so excess day RE can charge and discharge at night.
+- DISCOM included: grid import cap ~ peak (procurement backup). Captive: grid cap = 0.
 
-Charge increments RE-origin / grid-origin SOC buckets. Discharge depletes proportionally. ESO checks RE-origin share of stored energy (≥ 85% from concept note when applicable).
+---
 
-## Annual RE %
+## 3. Annual bill, ₹/kWh, savings and NPV
 
-\[
-\frac{\sum RE\_serving\_load_t}{\sum Load_t} \times 100
-\]
+- **Annual energy Rs** = annual_load_MWh × blended × 1000  
+- **Annual bill ₹ Cr** = energy + demand + fixed + compliance + additional costs  
+- **Power cost ₹/kWh** = Year-1 total bill / annual load kWh (TOTAL COST OF DELIVERED ENERGY — not plant LCOE)  
+- **Demand charge** = Peak_MW × DISCOM%/100 × demand Rs/MW-month × 12  
+- **Savings vs DISCOM** = 100% DISCOM bill - architecture bill  
+- **NPV of savings** = PV of yearly savings over project life at discount rate (Year-0 plant CAPEX = 0)
 
-## Hourly CFE %
+---
 
-\[
-CFE_t = \frac{RE\_serving\_load_t}{Load_t} \times 100
-\]
+## 4. Annual RE % and 24×7 CFE (availability)
 
-Pass modes: all hours ≥ target | mean ≥ target | share of hours ≥ target.
+### 4.1 Annual RE % (energy-weighted)
 
-Energy-weighted mean CFE equals annual RE%; unweighted mean and minimum generally differ.
+`RE% = (Sum RE_serving_load_t) / (Sum Load_t) × 100`
 
-## Commercial cost
+where RE_serving_load_t = direct Solar+Wind to load + RE-origin BESS discharge.
 
-Structure-specific stacking of grid energy (incl. TOD), demand/fixed charges, RE energy tariffs, network charges, OPEX, annualized CAPEX (CRF), compliance costs.
+Compared to `annual_re_target_pct`. This is **not** forced equal to Architecture Solar%+Wind%+BESS% every hour.
 
-## Financials
+### 4.2 Hourly CFE %
 
-Year-0 CAPEX (if included), escalated annual costs, BESS replacement, residual value. NPV at discount rate. IRR via Newton/bisection. Incremental NPV/IRR/payback vs DISCOM baseline.
+`CFE_t = Min(Load_t, Solar_t + Wind_t + RE_BESS_discharge_t) / Load_t × 100`
 
-## Optimization
+(If Load_t ~ 0, CFE_t is treated as 100%.)
 
-Staged:
+- **Day:** solar can dominate CF supply (within shape).  
+- **Night:** solar ~ 0; CFE from **wind** and/or **BESS**; otherwise CFE falls and may Fail the 24×7 rule.
 
-1. Capacity candidate set (Quick / Standard / Thorough)  
-2. 8,760 dispatch per candidate  
-3. Feasibility (unserved / RE / CFE flags)  
-4. Economic evaluation  
-5. Rank by objective; local neighborhood refine; return top 10  
+**Pass rule:** every study hour >= `hourly_cfe_target_pct` (min hourly CFE >= target).
 
-Optional LP dispatch (SciPy HiGHS, weekly blocks) when selected.
+**Architecture CF %** in analytics = contracted Solar%+Wind%+BESS% (bill / mix reference). Min hourly CFE is often **below** that when night coverage is weak.
+
+---
+
+## 5. Carbon
+
+- Baseline tCO₂ = load_MWh × grid EF  
+- Actual tCO₂ = load_MWh × (DISCOM%/100) × grid EF  
+- Carbon saved = baseline - actual  
+
+---
+
+## 6. Compliance
+
+| Metric | Actual basis |
+|--------|----------------|
+| Annual RE | Energy-weighted RE serving load (availability) |
+| Hourly CFE | Availability formula above |
+| RPO/RCO | Architecture RE % of DC load (contracted obligation) |
+| ESO | Contracted BESS mix % × annual load (MWh); RE-origin framing = 100% for contracted Storage |
+
+Feasibility for Captive/Hybrid gates on RE/CFE (and Applicable RPO/ESO) — **not** on plant-profile unserved (commercial `unserved_mwh` = 0).
+
+---
+
+## 7. Charts and diagnostics
+
+Hourly charts show **available** Load / Solar / Wind / BESS charge-discharge / DISCOM import and hourly CFE.
+
+Series note: Architecture mix sets annual contract energy and the bill; CFE is availability each hour (solar ~0 at night).
+
+---
+
+## 8. Out of scope
+
+Generation-plant CAPEX / OPEX / debt as commercial inputs; Optimization / Sensitivity plant invent; treating Architecture mix % as flat firm CFE every hour.

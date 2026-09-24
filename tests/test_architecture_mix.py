@@ -1,4 +1,4 @@
-"""Architecture mix % scales configured capacities for CAPTIVE / HYBRID / OA."""
+"""Architecture mix % is contracted energy share (buyer path — no plant MW)."""
 
 from __future__ import annotations
 
@@ -23,33 +23,24 @@ def _cfg(**overrides):
     return cfg
 
 
-def test_captive_mix_scales_solar_wind_bess_not_grid():
+def test_captive_forces_discom_off():
     cfg = _cfg(
         **{
             "commercial.structure": "CAPTIVE",
+            "commercial.include_discom": True,
             "commercial.include_solar": True,
-            "commercial.include_wind": True,
-            "commercial.include_bess": True,
-            "commercial.mix_solar_pct": 50.0,
-            "commercial.mix_wind_pct": 30.0,
-            "commercial.mix_bess_pct": 20.0,
-            "solar.capacity_mw": 400.0,
-            "wind.capacity_mw": 200.0,
-            "bess.power_mw": 100.0,
-            "bess.energy_mwh": 400.0,
-            "grid.max_import_mw": 250.0,
+            "commercial.include_wind": False,
+            "commercial.include_bess": False,
+            "commercial.mix_solar_pct": 100.0,
         }
     )
     out = apply_architecture_asset_flags(deepcopy(cfg))
-    assert v(out, "solar.capacity_mw") == 200.0
-    assert v(out, "wind.capacity_mw") == 60.0
-    assert v(out, "bess.power_mw") == 20.0
-    assert v(out, "bess.energy_mwh") == 80.0
-    # Captive forces DISCOM off → grid import zeroed (mix_discom ignored)
-    assert v(out, "grid.max_import_mw") == 0.0
+    assert v(out, "commercial.include_discom") is False
+    assert "bess" not in out
+    assert "capacity_mw" not in out.get("solar", {})
 
 
-def test_hybrid_mix_scales_discom_and_re():
+def test_hybrid_keeps_discom_flag():
     cfg = _cfg(
         **{
             "commercial.structure": "HYBRID",
@@ -60,22 +51,15 @@ def test_hybrid_mix_scales_discom_and_re():
             "commercial.mix_discom_pct": 25.0,
             "commercial.mix_solar_pct": 50.0,
             "commercial.mix_bess_pct": 25.0,
-            "solar.capacity_mw": 450.0,
-            "wind.capacity_mw": 300.0,
-            "bess.power_mw": 150.0,
-            "bess.energy_mwh": 600.0,
-            "grid.max_import_mw": 250.0,
         }
     )
     out = apply_architecture_asset_flags(deepcopy(cfg))
-    assert v(out, "grid.max_import_mw") == 62.5
-    assert v(out, "solar.capacity_mw") == 225.0
-    assert v(out, "wind.capacity_mw") == 0.0
-    assert v(out, "bess.power_mw") == 37.5
-    assert v(out, "bess.energy_mwh") == 150.0
+    assert v(out, "commercial.include_discom") is True
+    assert v(out, "commercial.include_solar") is True
+    assert v(out, "commercial.include_bess") is True
 
 
-def test_open_access_mix_discom_solar():
+def test_legacy_open_access_maps_to_hybrid_flags():
     cfg = _cfg(
         **{
             "commercial.structure": "OPEN_ACCESS",
@@ -86,25 +70,21 @@ def test_open_access_mix_discom_solar():
             "commercial.mix_discom_pct": 20.0,
             "commercial.mix_solar_pct": 50.0,
             "commercial.mix_wind_pct": 30.0,
-            "solar.capacity_mw": 500.0,
-            "wind.capacity_mw": 250.0,
-            "bess.power_mw": 150.0,
-            "bess.energy_mwh": 600.0,
-            "grid.max_import_mw": 200.0,
         }
     )
+    cfg = merge_missing_defaults(cfg)
+    cfg = recompute_calculated(cfg)
+    assert v(cfg, "commercial.structure") == "HYBRID"
     out = apply_architecture_asset_flags(deepcopy(cfg))
-    assert v(out, "grid.max_import_mw") == 40.0
-    assert v(out, "solar.capacity_mw") == 250.0
-    assert v(out, "wind.capacity_mw") == 75.0
-    assert v(out, "bess.power_mw") == 0.0
-    assert v(out, "bess.energy_mwh") == 0.0
+    assert v(out, "commercial.include_discom") is True
+    assert "bess" not in out
 
 
 def test_validate_rejects_mix_not_summing_to_100():
     cfg = _cfg(
         **{
             "commercial.structure": "CAPTIVE",
+            "commercial.include_discom": False,
             "commercial.include_solar": True,
             "commercial.include_wind": True,
             "commercial.include_bess": True,
@@ -121,6 +101,7 @@ def test_validate_accepts_mix_summing_to_100():
     cfg = _cfg(
         **{
             "commercial.structure": "CAPTIVE",
+            "commercial.include_discom": False,
             "commercial.include_solar": True,
             "commercial.include_wind": True,
             "commercial.include_bess": True,
@@ -140,7 +121,6 @@ def test_ensure_equalizes_old_independent_mixes():
     cfg["commercial"]["include_solar"]["value"] = True
     cfg["commercial"]["include_wind"]["value"] = True
     cfg["commercial"]["include_bess"]["value"] = True
-    # Legacy independent 100%s
     cfg["commercial"]["mix_solar_pct"]["value"] = 100.0
     cfg["commercial"]["mix_wind_pct"]["value"] = 100.0
     cfg["commercial"]["mix_bess_pct"]["value"] = 100.0
@@ -156,11 +136,19 @@ def test_ensure_equalizes_old_independent_mixes():
 def test_merge_equalizes_captive_defaults():
     cfg = get_default_config()
     cfg["commercial"]["structure"]["value"] = "CAPTIVE"
-    cfg["commercial"]["include_discom"]["value"] = False
-    merge_missing_defaults(cfg)
-    total = (
-        float(cfg["commercial"]["mix_solar_pct"]["value"])
-        + float(cfg["commercial"]["mix_wind_pct"]["value"])
-        + float(cfg["commercial"]["mix_bess_pct"]["value"])
-    )
+    cfg = merge_missing_defaults(cfg)
+    cfg = recompute_calculated(cfg)
+    keys = ["mix_solar_pct", "mix_wind_pct", "mix_bess_pct"]
+    total = sum(float(cfg["commercial"][k]["value"]) for k in keys)
     assert abs(total - 100.0) < 0.05
+
+
+def test_plant_leftovers_stripped_from_defaults():
+    cfg = get_default_config()
+    assert "bess" not in cfg
+    assert "optimization" not in cfg
+    assert "capacity_mw" not in cfg["solar"]
+    assert "capacity_mw" not in cfg["wind"]
+    assert "capex_inr_per_mw" not in cfg["solar"]
+    assert "financing_enabled" not in cfg["financial"]
+    assert "max_import_mw" not in cfg["grid"]

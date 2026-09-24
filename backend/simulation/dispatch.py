@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from config.defaults import v
+from config.defaults import v, v_opt
 
 
 @dataclass
@@ -41,6 +41,10 @@ class DispatchResult:
     grid_from_bess_mw: np.ndarray = field(default_factory=lambda: np.zeros(0))
     solar_origin_soc_mwh: np.ndarray = field(default_factory=lambda: np.zeros(0))
     wind_origin_soc_mwh: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    cf_supply_mw: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    matched_cf_mw: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    hydro_mw: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    nuclear_mw: np.ndarray = field(default_factory=lambda: np.zeros(0))
     meta: dict = field(default_factory=dict)
 
 
@@ -69,21 +73,26 @@ def rule_based_dispatch(
     grid_cap_mw: float | None = None,
 ) -> DispatchResult:
     n = len(load_mw)
-    power = float(bess_power_mw if bess_power_mw is not None else v(config, "bess.power_mw"))
-    energy = float(bess_energy_mwh if bess_energy_mwh is not None else v(config, "bess.energy_mwh"))
-    grid_cap = float(grid_cap_mw if grid_cap_mw is not None else v(config, "grid.max_import_mw"))
-    avail = float(v(config, "grid.availability_pct")) / 100.0
+    power = float(bess_power_mw if bess_power_mw is not None else v_opt(config, "bess.power_mw", 0.0) or 0.0)
+    energy = float(bess_energy_mwh if bess_energy_mwh is not None else v_opt(config, "bess.energy_mwh", 0.0) or 0.0)
+    grid_cap = float(grid_cap_mw if grid_cap_mw is not None else v_opt(config, "grid.max_import_mw", 0.0) or 0.0)
+    avail = float(v_opt(config, "grid.availability_pct", 100.0) or 100.0) / 100.0
     grid_cap_eff = grid_cap * avail
 
-    soc_min_pct = float(v(config, "bess.min_soc_pct")) / 100.0
-    soc_max_pct = float(v(config, "bess.max_soc_pct")) / 100.0
-    soc0_pct = float(v(config, "bess.initial_soc_pct")) / 100.0
-    # Ideal inverter: charge/discharge at power_mw with 100% one-way efficiency
-    eta_c = 1.0
-    eta_d = 1.0
+    soc_min_pct = float(v_opt(config, "bess.min_soc_pct", 10.0) or 10.0) / 100.0
+    soc_max_pct = float(v_opt(config, "bess.max_soc_pct", 95.0) or 95.0) / 100.0
+    soc0_pct = float(v_opt(config, "bess.initial_soc_pct", 50.0) or 50.0) / 100.0
+    try:
+        eta_c = max(1e-6, min(1.0, float(v(config, "bess.charge_efficiency_pct")) / 100.0))
+    except Exception:
+        eta_c = 1.0
+    try:
+        eta_d = max(1e-6, min(1.0, float(v(config, "bess.discharge_efficiency_pct")) / 100.0))
+    except Exception:
+        eta_d = 1.0
     max_c = power
     max_d = power
-    allow_grid_charge = bool(v(config, "bess.allow_grid_charge"))
+    allow_grid_charge = bool(v_opt(config, "bess.allow_grid_charge", False))
 
     if energy <= 0 or power <= 0:
         energy = 0.0
@@ -225,7 +234,6 @@ def rule_based_dispatch(
         direct_re[t] = d_re
         re_from_bess[t] = re_d
         re_serving[t] = d_re + re_d
-        cfe[t] = (re_serving[t] / load * 100.0) if load > 1e-9 else 100.0
         ch_re[t] = c_re
         ch_grid[t] = c_g
         solar_to_load[t] = s_to_load
@@ -241,6 +249,20 @@ def rule_based_dispatch(
         supply = sol + win + d_max + g + unserved_t
         demand = load + (c_re + c_g) + curtail_t
         bal_err[t] = supply - demand
+
+    # 24×7 CFE from hourly availability: Solar + Wind + RE-origin BESS discharge
+    from backend.compliance.cfe_analytics import CFE_FORMULA, compute_hourly_cfe_pct
+
+    hydro = np.zeros(n, dtype=float)
+    nuclear = np.zeros(n, dtype=float)
+    cfe, cf_supply, matched_cf = compute_hourly_cfe_pct(
+        load_mw,
+        solar_mw=solar_mw,
+        wind_mw=wind_mw,
+        hydro_mw=hydro,
+        nuclear_mw=nuclear,
+        bess_cf_discharge_mw=re_from_bess,
+    )
 
     # Final SOC should still be physical
     max_abs_err = float(np.max(np.abs(bal_err))) if n else 0.0
@@ -274,6 +296,10 @@ def rule_based_dispatch(
         grid_from_bess_mw=grid_from_bess,
         solar_origin_soc_mwh=solar_soc_arr,
         wind_origin_soc_mwh=wind_soc_arr,
+        cf_supply_mw=cf_supply,
+        matched_cf_mw=matched_cf,
+        hydro_mw=hydro,
+        nuclear_mw=nuclear,
         meta={
             "dispatch_mode": "Rule-Based",
             "max_abs_balance_error_mw": max_abs_err,
@@ -284,6 +310,7 @@ def rule_based_dispatch(
             "eta_c": eta_c,
             "eta_d": eta_d,
             "tariff_inr_per_kwh": _tariff_series(config, n, hod),
+            "cfe_formula": CFE_FORMULA,
         },
     )
 
@@ -313,16 +340,22 @@ def lp_dispatch(
     # Full 8760 LP is large; solve in weekly blocks with SOC carry-over for practicality.
     n = len(load_mw)
     block = 24 * 7
-    power = float(bess_power_mw if bess_power_mw is not None else v(config, "bess.power_mw"))
-    energy = float(bess_energy_mwh if bess_energy_mwh is not None else v(config, "bess.energy_mwh"))
-    grid_cap = float(grid_cap_mw if grid_cap_mw is not None else v(config, "grid.max_import_mw"))
-    avail = float(v(config, "grid.availability_pct")) / 100.0
+    power = float(bess_power_mw if bess_power_mw is not None else v_opt(config, "bess.power_mw", 0.0) or 0.0)
+    energy = float(bess_energy_mwh if bess_energy_mwh is not None else v_opt(config, "bess.energy_mwh", 0.0) or 0.0)
+    grid_cap = float(grid_cap_mw if grid_cap_mw is not None else v_opt(config, "grid.max_import_mw", 0.0) or 0.0)
+    avail = float(v_opt(config, "grid.availability_pct", 100.0) or 100.0) / 100.0
     grid_cap_eff = grid_cap * avail
-    eta_c = 1.0
-    eta_d = 1.0
-    soc_min = float(v(config, "bess.min_soc_pct")) / 100.0 * energy
-    soc_max = float(v(config, "bess.max_soc_pct")) / 100.0 * energy
-    soc = float(np.clip(float(v(config, "bess.initial_soc_pct")) / 100.0 * energy, soc_min, soc_max))
+    try:
+        eta_c = max(1e-6, min(1.0, float(v(config, "bess.charge_efficiency_pct")) / 100.0))
+    except Exception:
+        eta_c = 1.0
+    try:
+        eta_d = max(1e-6, min(1.0, float(v(config, "bess.discharge_efficiency_pct")) / 100.0))
+    except Exception:
+        eta_d = 1.0
+    soc_min = float(v_opt(config, "bess.min_soc_pct", 10.0) or 10.0) / 100.0 * energy
+    soc_max = float(v_opt(config, "bess.max_soc_pct", 95.0) or 95.0) / 100.0 * energy
+    soc = float(np.clip(float(v_opt(config, "bess.initial_soc_pct", 50.0) or 50.0) / 100.0 * energy, soc_min, soc_max))
     tariff = _tariff_series(config, n, hod)
 
     if energy <= 0 or power <= 0:
@@ -431,7 +464,7 @@ def lp_dispatch(
     # Rebuild origin tracking & CFE with a second pass using LP charge/discharge schedules
     # by replaying SOC origin accounting
     unserved = np.zeros(n)
-    re_soc = float(np.clip(float(v(config, "bess.initial_soc_pct")) / 100.0 * energy, soc_min, soc_max))
+    re_soc = float(np.clip(float(v_opt(config, "bess.initial_soc_pct", 50.0) or 50.0) / 100.0 * energy, soc_min, soc_max))
     grid_soc = 0.0
     soc = re_soc
     direct_re = np.zeros(n)
@@ -476,10 +509,22 @@ def lp_dispatch(
         direct_re[t] = d_re
         re_from_bess[t] = re_d
         re_serving[t] = d_re + re_d
-        cfe[t] = (re_serving[t] / load * 100.0) if load > 1e-9 else 100.0
         ch_re[t] = c_re
         ch_grid[t] = c_g
         bal_err[t] = (solar_mw[t] + wind_mw[t] + d + g + unserved[t]) - (load + c + cu)
+
+    from backend.compliance.cfe_analytics import CFE_FORMULA, compute_hourly_cfe_pct
+
+    hydro = np.zeros(n, dtype=float)
+    nuclear = np.zeros(n, dtype=float)
+    cfe, cf_supply, matched_cf = compute_hourly_cfe_pct(
+        load_mw,
+        solar_mw=solar_mw,
+        wind_mw=wind_mw,
+        hydro_mw=hydro,
+        nuclear_mw=nuclear,
+        bess_cf_discharge_mw=re_from_bess,
+    )
 
     result = DispatchResult(
         load_mw=load_mw.astype(float),
@@ -500,6 +545,10 @@ def lp_dispatch(
         charge_from_re_mw=ch_re,
         charge_from_grid_mw=ch_grid,
         balance_error_mw=bal_err,
+        cf_supply_mw=cf_supply,
+        matched_cf_mw=matched_cf,
+        hydro_mw=hydro,
+        nuclear_mw=nuclear,
         meta={
             "dispatch_mode": "LP Dispatch",
             "max_abs_balance_error_mw": float(np.max(np.abs(bal_err))) if n else 0.0,
@@ -510,6 +559,7 @@ def lp_dispatch(
             "eta_c": eta_c,
             "eta_d": eta_d,
             "tariff_inr_per_kwh": tariff,
+            "cfe_formula": CFE_FORMULA,
         },
     )
     return enrich_split_flows(result)
@@ -590,7 +640,7 @@ def run_dispatch(
     hod: np.ndarray,
     **overrides,
 ) -> DispatchResult:
-    mode = str(v(config, "optimization.dispatch_mode"))
+    mode = str(v_opt(config, "optimization.dispatch_mode", "Rule-Based") or "Rule-Based")
     solar_full = np.asarray(solar_mw, dtype=float).copy()
     wind_full = np.asarray(wind_mw, dtype=float).copy()
     solar_avail, wind_avail, force_s, force_w = _apply_input_re_curtailment(config, solar_full, wind_full)

@@ -87,6 +87,25 @@ DEFAULT_CONFIG = {
             kind="select",
             options=["INR", "USD", "EUR"],
         ),
+
+        "study_start_month": P(
+            1,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Study period start month (1=Jan). Model hours = days in range × 24.",
+            kind="integer",
+            minimum=1,
+            maximum=12,
+        ),
+        "study_end_month": P(
+            12,
+            "",
+            DEFAULT_ASSUMPTION,
+            "Study period end month (1=Jan … 12=Dec).",
+            kind="integer",
+            minimum=1,
+            maximum=12,
+        ),
         "model_hours": P(
             8760,
             "h",
@@ -143,17 +162,18 @@ DEFAULT_CONFIG = {
         "facility_name": P(
             "Default Data Centre - 250 MW",
             "",
-            DEFAULT_ASSUMPTION,
-            "Facility name for reports.",
+            CALCULATED,
+            "Same as General → Project name. Used on reports.",
             kind="text",
+            editable=False,
         ),
         "it_capacity_mw": P(
             250.0,
             "MW",
             DEFAULT_ASSUMPTION,
-            "Nameplate IT capacity used to label the default project.",
-            minimum=0,
-            step=1,
+            "IT / critical load (MW). Same value drives Load → IT load and facility peak = IT × PUE.",
+            minimum=0.01,
+            step=0.1,
         ),
         "grid_connection_kv": P(
             220.0,
@@ -177,32 +197,89 @@ DEFAULT_CONFIG = {
             "SYNTHETIC",
             "",
             DEFAULT_ASSUMPTION,
-            "SYNTHETIC = parameterized generator. PROJECT DATA = imported 8,760 hourly MW series (optional).",
+            "SYNTHETIC = parameterized generator. PROJECT DATA = imported hourly MW series (optional).",
             kind="select",
             options=["SYNTHETIC", "PROJECT DATA"],
+        ),
+        "it_load_mw": P(
+            250.0,
+            "MW",
+            CALCULATED,
+            "Same as Data Centre → IT capacity. Facility peak = IT Load × PUE.",
+            minimum=0.01,
+            step=0.1,
+            editable=False,
+        ),
+        "pue": P(
+            1.25,
+            "x",
+            DEFAULT_ASSUMPTION,
+            "Power Usage Effectiveness. Total facility load = IT Load × PUE.",
+            minimum=1.0,
+            maximum=3.0,
+            step=0.01,
         ),
         "peak_load_mw": P(
             250.0,
             "MW",
-            DEFAULT_ASSUMPTION,
-            "Peak data-centre demand used to generate the 8,760 profile.",
+            CALCULATED,
+            "Total facility load = it_load_mw × pue. Used for the hourly load profile over the study period.",
             minimum=0.01,
             step=0.1,
+            editable=False,
         ),
         "load_factor_pct": P(
+            70.0,
+            "%",
+            CALCULATED,
+            "Primary load factor (synced from Scenario 1). Actual average = Total load × LF. "
+            "Run Analysis evaluates four LF scenarios in one pass.",
+            minimum=1,
+            maximum=100,
+            step=0.1,
+            editable=False,
+        ),
+        "load_factor_s1_pct": P(
+            70.0,
+            "%",
+            DEFAULT_ASSUMPTION,
+            "Load-factor scenario 1. Actual Load = Total load × LF. All four scenarios run in one analysis.",
+            minimum=1,
+            maximum=100,
+            step=0.1,
+        ),
+        "load_factor_s2_pct": P(
             80.0,
             "%",
             DEFAULT_ASSUMPTION,
-            "Target annual load factor. Actual realised load factor is calculated from the generated profile.",
+            "Load-factor scenario 2. Actual Load = Total load × LF.",
+            minimum=1,
+            maximum=100,
+            step=0.1,
+        ),
+        "load_factor_s3_pct": P(
+            90.0,
+            "%",
+            DEFAULT_ASSUMPTION,
+            "Load-factor scenario 3. Actual Load = Total load × LF.",
+            minimum=1,
+            maximum=100,
+            step=0.1,
+        ),
+        "load_factor_s4_pct": P(
+            100.0,
+            "%",
+            DEFAULT_ASSUMPTION,
+            "Load-factor scenario 4. Actual Load = Total load × LF.",
             minimum=1,
             maximum=100,
             step=0.1,
         ),
         "base_load_mw": P(
-            200.0,
+            175.0,
             "MW",
             CALCULATED,
-            "peak_load_mw × load_factor_pct / 100 for the default flat interpretation. Recalculated on edit.",
+            "Actual average load = peak_load_mw × load_factor_pct / 100.",
             editable=False,
         ),
         "operating_hours": P(
@@ -215,13 +292,58 @@ DEFAULT_CONFIG = {
             kind="integer",
         ),
         "load_model": P(
-            "Custom Parameterized",
+            "Seasonal TOD",
             "",
             DEFAULT_ASSUMPTION,
-            "How the 8,760-hour load shape is generated.",
+            "How the hourly load shape is generated. Seasonal TOD is the default commercial path.",
             kind="select",
-            options=["Flat", "Daily Pattern", "Weekday/Weekend", "Seasonal", "Custom Parameterized"],
+            options=["Seasonal TOD", "Flat", "Daily Pattern", "Weekday/Weekend", "Seasonal", "Custom Parameterized"],
         ),
+        "seasonal_tod_summer_months": P(
+            "3,4,5",
+            "",
+            DEFAULT_ASSUMPTION,
+            "Summer months (1–12, comma-separated) for Seasonal TOD shaping.",
+            kind="text",
+        ),
+        "seasonal_tod_rainy_months": P(
+            "6,7,8,9",
+            "",
+            DEFAULT_ASSUMPTION,
+            "Rainy / monsoon months for Seasonal TOD shaping.",
+            kind="text",
+        ),
+        "seasonal_tod_winter_months": P(
+            "10,11,12,1,2",
+            "",
+            DEFAULT_ASSUMPTION,
+            "Winter months for Seasonal TOD shaping.",
+            kind="text",
+        ),
+        "seasonal_tod_day_start_hour": P(
+            8,
+            "h",
+            DEFAULT_ASSUMPTION,
+            "Day TOD start (hour 0–23). Default 8 = 8AM. Day band is start ≤ hour < end; night is the rest.",
+            kind="integer",
+            minimum=0,
+            maximum=23,
+        ),
+        "seasonal_tod_day_end_hour": P(
+            20,
+            "h",
+            DEFAULT_ASSUMPTION,
+            "Day TOD end exclusive (hour 0–23). Default 20 = 8PM. With start 8 → day 8AM–8PM, night 8PM–8AM.",
+            kind="integer",
+            minimum=0,
+            maximum=23,
+        ),
+        "seasonal_tod_summer_day": P(1.05, "x", DEFAULT_ASSUMPTION, "Summer day-band shape multiplier.", minimum=0, step=0.01),
+        "seasonal_tod_summer_night": P(0.95, "x", DEFAULT_ASSUMPTION, "Summer night-band shape multiplier.", minimum=0, step=0.01),
+        "seasonal_tod_rainy_day": P(1.02, "x", DEFAULT_ASSUMPTION, "Rainy day-band shape multiplier.", minimum=0, step=0.01),
+        "seasonal_tod_rainy_night": P(0.98, "x", DEFAULT_ASSUMPTION, "Rainy night-band shape multiplier.", minimum=0, step=0.01),
+        "seasonal_tod_winter_day": P(1.03, "x", DEFAULT_ASSUMPTION, "Winter day-band shape multiplier.", minimum=0, step=0.01),
+        "seasonal_tod_winter_night": P(0.97, "x", DEFAULT_ASSUMPTION, "Winter night-band shape multiplier.", minimum=0, step=0.01),
         "weekday_multiplier": P(
             1.0,
             "x",
@@ -237,13 +359,6 @@ DEFAULT_CONFIG = {
             "Weekend shape multiplier before load-factor scaling.",
             minimum=0,
             step=0.01,
-        ),
-        "growth_rate_pct": P(
-            0.0,
-            "%/yr",
-            DEFAULT_ASSUMPTION,
-            "Not applied inside a single 8,760-hour year. Reserved for multi-year cash-flow load growth.",
-            step=0.1,
         ),
         "study_years": P(
             1,
@@ -295,17 +410,11 @@ DEFAULT_CONFIG = {
             kind="select",
             options=["SYNTHETIC", "PROJECT DATA"],
         ),
-        "capacity_mw": P(450.0, "MW", DEFAULT_ASSUMPTION, "Installed solar AC capacity.", minimum=0, step=1),
         "capacity_factor_pct": P(22.0, "%", DEFAULT_ASSUMPTION, "Target annual capacity factor used to scale the synthetic profile.", minimum=0, maximum=80, step=0.1),
         "sunrise_hour": P(6.0, "h", DEFAULT_ASSUMPTION, "Hour of day (0–24) at which generation becomes non-zero.", minimum=0, maximum=12, step=0.5),
         "sunset_hour": P(18.0, "h", DEFAULT_ASSUMPTION, "Hour of day at which generation returns to zero.", minimum=12, maximum=24, step=0.5),
         "peak_generation_hour": P(12.0, "h", DEFAULT_ASSUMPTION, "Hour of day of the diurnal peak.", minimum=0, maximum=24, step=0.5),
         "hourly_variability": P(0.12, "frac", DEFAULT_ASSUMPTION, "Deterministic relative noise amplitude applied in daylight hours.", minimum=0, maximum=1, step=0.01),
-        "degradation_pct": P(0.50, "%/yr", DEFAULT_ASSUMPTION, "Annual generation degradation applied in the financial years after year 1.", minimum=0, step=0.05),
-        "project_life_yr": P(25, "yr", DEFAULT_ASSUMPTION, "Solar asset life for annualisation.", kind="integer", minimum=1, maximum=40),
-        "capex_inr_per_mw": P(45_000_000.0, "₹/MW", DEFAULT_ASSUMPTION, "Solar overnight CAPEX."),
-        "opex_inr_per_mw_year": P(600_000.0, "₹/MW-yr", DEFAULT_ASSUMPTION, "Solar fixed OPEX."),
-        "energy_cost_inr_per_kwh": P(2.50, "₹/kWh", DEFAULT_ASSUMPTION, "Contracted solar energy price when the commercial structure uses an energy tariff rather than CAPEX recovery."),
         "seasonal_winter": P(
             0.80,
             "x",
@@ -348,14 +457,8 @@ DEFAULT_CONFIG = {
             kind="select",
             options=["SYNTHETIC", "PROJECT DATA"],
         ),
-        "capacity_mw": P(300.0, "MW", DEFAULT_ASSUMPTION, "Installed wind AC capacity.", minimum=0, step=1),
         "capacity_factor_pct": P(32.0, "%", DEFAULT_ASSUMPTION, "Target annual capacity factor used to scale the synthetic profile.", minimum=0, maximum=80, step=0.1),
         "hourly_variability": P(0.28, "frac", DEFAULT_ASSUMPTION, "Deterministic relative noise amplitude for hourly wind.", minimum=0, maximum=1, step=0.01),
-        "degradation_pct": P(0.25, "%/yr", DEFAULT_ASSUMPTION, "Annual wind degradation applied after year 1.", minimum=0, step=0.05),
-        "project_life_yr": P(25, "yr", DEFAULT_ASSUMPTION, "Wind asset life for annualisation.", kind="integer", minimum=1, maximum=40),
-        "capex_inr_per_mw": P(65_000_000.0, "₹/MW", DEFAULT_ASSUMPTION, "Wind overnight CAPEX."),
-        "opex_inr_per_mw_year": P(1_200_000.0, "₹/MW-yr", DEFAULT_ASSUMPTION, "Wind fixed OPEX."),
-        "energy_cost_inr_per_kwh": P(3.20, "₹/kWh", DEFAULT_ASSUMPTION, "Contracted wind energy price when used as a tariff."),
         "seasonal_winter": P(
             0.72,
             "x",
@@ -389,32 +492,8 @@ DEFAULT_CONFIG = {
             step=0.01,
         ),
     },
-    "bess": {
-        "power_mw": P(
-            150.0,
-            "MW",
-            DEFAULT_ASSUMPTION,
-            "BESS power rating — used as both maximum charge and discharge power.",
-            minimum=0,
-            step=1,
-        ),
-        "energy_mwh": P(600.0, "MWh", DEFAULT_ASSUMPTION, "Usable energy capacity at 100% SOC window before min/max SOC.", minimum=0, step=1),
-        "initial_soc_pct": P(50.0, "%", DEFAULT_ASSUMPTION, "Starting state of charge.", minimum=0, maximum=100, step=1),
-        "min_soc_pct": P(10.0, "%", DEFAULT_ASSUMPTION, "Lower SOC bound.", minimum=0, maximum=100, step=1),
-        "max_soc_pct": P(95.0, "%", DEFAULT_ASSUMPTION, "Upper SOC bound.", minimum=0, maximum=100, step=1),
-        "calendar_degradation_pct": P(2.0, "%/yr", DEFAULT_ASSUMPTION, "Calendar fade used in multi-year energy availability."),
-        "cycle_degradation_pct": P(0.005, "%/cycle", DEFAULT_ASSUMPTION, "Throughput fade per equivalent full cycle."),
-        "capex_inr_per_mw": P(5_000_000.0, "₹/MW", DEFAULT_ASSUMPTION, "Power-side BESS CAPEX."),
-        "capex_inr_per_mwh": P(18_000_000.0, "₹/MWh", DEFAULT_ASSUMPTION, "Energy-side BESS CAPEX."),
-        "opex_inr_per_year": P(12_900_000.0, "₹/yr", DEFAULT_ASSUMPTION, "Annual BESS O&M. Default ≈ 2% of power-side CAPEX for the 150 MW default."),
-        "project_life_yr": P(15, "yr", DEFAULT_ASSUMPTION, "BESS operating life before replacement.", kind="integer", minimum=1),
-        "replacement_year": P(15, "yr", DEFAULT_ASSUMPTION, "Year in which replacement CAPEX is incurred (1-indexed).", kind="integer", minimum=1),
-        "replacement_cost_pct": P(70.0, "%", DEFAULT_ASSUMPTION, "Replacement cost as % of initial BESS CAPEX."),
-        "allow_grid_charge": P(False, "", DEFAULT_ASSUMPTION, "If true, residual grid energy may charge BESS after serving load.", kind="boolean"),
-    },
     "grid": {
         "connection_voltage_kv": P(220.0, "kV", CONCEPT_NOTE, "Grid interconnection voltage from the concept note."),
-        "max_import_mw": P(250.0, "MW", DEFAULT_ASSUMPTION, "Maximum grid import capacity in any hour."),
         "energy_tariff_inr_per_kwh": P(8.50, "₹/kWh", DEFAULT_ASSUMPTION, "Flat energy tariff if time-of-day is disabled."),
         "use_tod": P(True, "", DEFAULT_ASSUMPTION, "Apply peak/off-peak energy tariffs.", kind="boolean"),
         "tod_peak_start_hour": P(18, "h", DEFAULT_ASSUMPTION, "Start of peak TOD window.", kind="integer", minimum=0, maximum=23),
@@ -446,6 +525,27 @@ DEFAULT_CONFIG = {
         "availability_pct": P(99.5, "%", DEFAULT_ASSUMPTION, "Deterministic availability: first (1-a)×8760 hours of each year are scaled; implemented as a constant derate of max import."),
         "tariff_escalation_pct": P(4.0, "%/yr", DEFAULT_ASSUMPTION, "Grid tariff escalation in the financial model."),
         "banking_enabled": P(False, "", DEFAULT_ASSUMPTION, "Legacy Grid-tab banking switch. RE banking uses commercial.re_banking_enabled.", kind="boolean"),
+        "demand_charge_inr_per_kva_month": P(
+            400.0,
+            "₹/kVA-month",
+            DEFAULT_ASSUMPTION,
+            "DISCOM demand charge (₹/kVA/month). Engine uses ₹/MW-month = this × 1,000.",
+            minimum=0,
+            step=1,
+        ),
+        "meter_rent_inr_per_month": P(0.0, "₹/month", DEFAULT_ASSUMPTION, "Meter rent (monthly). Added to annual fixed grid cost × 12."),
+        "liquidated_damages_inr_per_month": P(0.0, "₹/month", DEFAULT_ASSUMPTION, "Liquidated damages / default charge (monthly). Added × 12 to annual fixed cost."),
+        "power_factor": P(0.95, "PU", DEFAULT_ASSUMPTION, "Power factor (PU). Documentation / optional kVArh framing."),
+        "kvarh_lagging_inr_per_kvarh": P(0.0, "₹/kVArh", DEFAULT_ASSUMPTION, "kVArh charge for lagging PF (not auto-applied without reactive series)."),
+        "kvarh_leading_inr_per_kvarh": P(0.0, "₹/kVArh", DEFAULT_ASSUMPTION, "kVArh surcharge for leading PF (not auto-applied without reactive series)."),
+        "grid_restricted": P(False, "", DEFAULT_ASSUMPTION, "Grid restricted flag (contract / operational constraint marker).", kind="boolean"),
+        "excel_discom_energy_inr_per_kwh": P(8.44, "₹/kWh", DEFAULT_ASSUMPTION, "DISCOM Energy Charges (base energy tariff).", step=0.01),
+        "excel_discom_wheeling_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "DISCOM Wheeling charges.", step=0.01),
+        "excel_discom_tod_inr_per_kwh": P(-0.56, "₹/kWh", DEFAULT_ASSUMPTION, "DISCOM net TOD adjustment (peak extra − off-peak rebate; may be negative).", step=0.01),
+        "excel_discom_ed_inr_per_kwh": P(0.59, "₹/kWh", DEFAULT_ASSUMPTION, "DISCOM Electricity duty (₹/kWh).", step=0.01),
+        "excel_discom_tose_inr_per_kwh": P(0.28, "₹/kWh", DEFAULT_ASSUMPTION, "DISCOM TOSE / other statutory surcharge (₹/kWh).", step=0.01),
+        "excel_discom_other_volumetric_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "DISCOM other volumetric charges (FPPCA / misc ₹/kWh).", step=0.01),
+        "excel_discom_total_inr_per_kwh": P(8.75, "₹/kWh", CALCULATED, "Total DISCOM = Energy + Wheeling + TOD + ED + TOSE + Other.", editable=False, step=0.01),
     },
     "commercial": {
         "structure": P(
@@ -485,12 +585,73 @@ DEFAULT_CONFIG = {
             "Include BESS. Selectable for CAPTIVE, HYBRID and OPEN ACCESS. Off for DISCOM.",
             kind="boolean",
         ),
+
+        "cost_blend_basis": P(
+            "TARGET_POWER_PCT",
+            "",
+            DEFAULT_ASSUMPTION,
+            "CAPTIVE/HYBRID energy blend: TARGET_POWER_PCT = Architecture Percentage of power; "
+            "SIMULATED_ENERGY_SHARE = same contracted Architecture mix % (DC buyer — suppliers deliver "
+            "at fixed rates; no plant MW/MWh). Bill = mix % × DISCOM/Solar/Wind stacks + Storage tariff.",
+            kind="select",
+            options=["TARGET_POWER_PCT", "SIMULATED_ENERGY_SHARE"],
+        ),
+        "excel_solar_ppa_inr_per_kwh": P(3.5, "₹/kWh", DEFAULT_ASSUMPTION, "Solar Energy Charges PPA (MH captive sample).", step=0.01),
+        "excel_solar_energy_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Energy Charges (Solar; usually 0 when PPA is used).", step=0.01),
+        "excel_solar_wheeling_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Wheeling (0 for EHV/STU captive; ~0.60 HT third-party).", step=0.01),
+        "excel_solar_transmission_inr_per_kwh": P(0.50, "₹/kWh", DEFAULT_ASSUMPTION, "Transmission (MH RE OA sample ~0.49–0.50).", step=0.01),
+        "excel_solar_transmission_loss_inr_per_kwh": P(0.11, "₹/kWh", DEFAULT_ASSUMPTION, "Transmission loss ₹/kWh proxy (~3.18% × PPA).", step=0.01),
+        "excel_solar_css_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "CSS (0 for captive / GEOA exemption paths).", step=0.01),
+        "excel_solar_as_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Additional surcharge (0 for captive / GEOA + demand charges).", step=0.01),
+        "excel_solar_sldc_inr_per_kwh": P(0.05, "₹/kWh", DEFAULT_ASSUMPTION, "SLDC volumetric proxy (actual often ₹/MW/day).", step=0.01),
+        "excel_solar_banking_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Banking ₹/kWh (MH GEOA is typically 8% in-kind).", step=0.01),
+        "excel_solar_ed_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Electricity duty on solar.", step=0.01),
+        "excel_solar_tose_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "TOSE on solar.", step=0.01),
+        "excel_solar_total_inr_per_kwh": P(4.16, "₹/kWh", CALCULATED, "Sum of solar charge stack (PPA + charges).", editable=False, step=0.01),
+        "excel_wind_ppa_inr_per_kwh": P(3.5, "₹/kWh", DEFAULT_ASSUMPTION, "Wind Energy Charges PPA (MH captive sample).", step=0.01),
+        "excel_wind_energy_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Energy Charges (Wind).", step=0.01),
+        "excel_wind_wheeling_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Wheeling (0 for EHV/STU captive; ~0.60 HT third-party).", step=0.01),
+        "excel_wind_transmission_inr_per_kwh": P(0.50, "₹/kWh", DEFAULT_ASSUMPTION, "Transmission (MH RE OA sample ~0.49–0.50).", step=0.01),
+        "excel_wind_transmission_loss_inr_per_kwh": P(0.11, "₹/kWh", DEFAULT_ASSUMPTION, "Transmission loss ₹/kWh proxy (~3.18% × PPA).", step=0.01),
+        "excel_wind_css_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "CSS (0 for captive / GEOA exemption paths).", step=0.01),
+        "excel_wind_as_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Additional surcharge (0 for captive / GEOA + demand charges).", step=0.01),
+        "excel_wind_sldc_inr_per_kwh": P(0.05, "₹/kWh", DEFAULT_ASSUMPTION, "SLDC volumetric proxy (actual often ₹/MW/day).", step=0.01),
+        "excel_wind_banking_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Banking ₹/kWh (MH GEOA is typically 8% in-kind).", step=0.01),
+        "excel_wind_ed_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Electricity duty (Wind).", step=0.01),
+        "excel_wind_tose_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "TOSE (Wind).", step=0.01),
+        "excel_wind_total_inr_per_kwh": P(4.16, "₹/kWh", CALCULATED, "Sum of wind charge stack.", editable=False, step=0.01),
+        "excel_bess_ppa_inr_per_kwh": P(
+            0.0,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "Storage tariff (₹/kWh) — consumer fixed rate for BESS % of power. "
+            "No BESS CAPEX/OPEX; enter the contracted ₹/kWh.",
+            step=0.01,
+        ),
+        "excel_bess_energy_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Energy Charges (BESS). Captive/Hybrid: unused (0).", step=0.01),
+        "excel_bess_wheeling_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Wheeling (BESS). Not used for on-site Captive/Hybrid storage.", step=0.01),
+        "excel_bess_transmission_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Transmission (BESS). Not used for on-site Captive/Hybrid storage.", step=0.01),
+        "excel_bess_transmission_loss_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Transmission losses (BESS). Not used for Captive/Hybrid.", step=0.01),
+        "excel_bess_css_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "CSS (BESS). Not used for on-site Captive/Hybrid storage.", step=0.01),
+        "excel_bess_as_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Additional surcharge (BESS). Not used for Captive/Hybrid.", step=0.01),
+        "excel_bess_sldc_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "SLDC (BESS). Not used for Captive/Hybrid.", step=0.01),
+        "excel_bess_banking_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Banking (BESS). Not used for Captive/Hybrid.", step=0.01),
+        "excel_bess_ed_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "Electricity duty (BESS). Not used for Captive/Hybrid.", step=0.01),
+        "excel_bess_tose_inr_per_kwh": P(0.0, "₹/kWh", DEFAULT_ASSUMPTION, "TOSE (BESS). Not used for Captive/Hybrid.", step=0.01),
+        "excel_bess_total_inr_per_kwh": P(
+            0.0,
+            "₹/kWh",
+            CALCULATED,
+            "Captive/Hybrid: equals Storage tariff. Open Access: sum of BESS charge stack.",
+            editable=False,
+            step=0.01,
+        ),
         "mix_discom_pct": P(
             25.0,
             "%",
             DEFAULT_ASSUMPTION,
-            "DISCOM/grid share of the architecture mix (HYBRID / OPEN ACCESS). "
-            "Selected assets’ mix % must sum to 100. Effective max import = grid.max_import_mw × this % / 100.",
+            "DISCOM/grid share of Architecture Percentage of power (HYBRID). "
+            "Selected assets’ mix % must sum to 100. Pricing share only.",
             minimum=0,
             maximum=100,
             step=1,
@@ -499,8 +660,8 @@ DEFAULT_CONFIG = {
             35.0,
             "%",
             DEFAULT_ASSUMPTION,
-            "Solar share of the architecture mix (CAPTIVE / HYBRID / OPEN ACCESS). "
-            "Selected assets’ mix % must sum to 100. Effective solar MW = solar.capacity_mw × this % / 100.",
+            "Solar share of Architecture Percentage of power (CAPTIVE / HYBRID). "
+            "Selected assets’ mix % must sum to 100. Pricing / energy-contract share.",
             minimum=0,
             maximum=100,
             step=1,
@@ -509,8 +670,8 @@ DEFAULT_CONFIG = {
             25.0,
             "%",
             DEFAULT_ASSUMPTION,
-            "Wind share of the architecture mix (CAPTIVE / HYBRID / OPEN ACCESS). "
-            "Selected assets’ mix % must sum to 100. Effective wind MW = wind.capacity_mw × this % / 100.",
+            "Wind share of Architecture Percentage of power (CAPTIVE / HYBRID). "
+            "Selected assets’ mix % must sum to 100. Pricing / energy-contract share.",
             minimum=0,
             maximum=100,
             step=1,
@@ -519,24 +680,38 @@ DEFAULT_CONFIG = {
             15.0,
             "%",
             DEFAULT_ASSUMPTION,
-            "BESS share of the architecture mix (CAPTIVE / HYBRID / OPEN ACCESS). "
-            "Selected assets’ mix % must sum to 100. Effective BESS MW/MWh = configured × this % / 100.",
+            "BESS share of contracted Architecture energy (CAPTIVE / HYBRID). "
+            "Priced at Storage tariff ₹/kWh — not a plant MW/MWh size. "
+            "Selected assets’ mix % must sum to 100.",
             minimum=0,
             maximum=100,
             step=1,
+        ),
+        "grid_power_pct": P(
+            25.0,
+            "%",
+            CALCULATED,
+            "Alias of DISCOM / grid mix % (synced from mix_discom_pct when DISCOM is included).",
+            editable=False,
+            minimum=0,
+            maximum=100,
+            step=0.1,
+        ),
+        "captive_re_pct": P(
+            75.0,
+            "%",
+            CALCULATED,
+            "Alias of RE mix % = Solar + Wind + BESS selected shares (synced on recompute).",
+            editable=False,
+            minimum=0,
+            maximum=100,
+            step=0.1,
         ),
         "discom_name": P("MSEDCL", "", CONCEPT_NOTE, "DISCOM counterparty name referenced in the concept note DISCOM structure.", kind="text"),
         "captive_ownership_pct": P(26.0, "%", DEFAULT_ASSUMPTION, "Captive ownership share. Not a legal qualification test."),
         "captive_allocation_pct": P(100.0, "%", DEFAULT_ASSUMPTION, "Share of RE project output allocated to this data centre."),
         "captive_energy_price": P(3.80, "₹/kWh", DEFAULT_ASSUMPTION, "Captive delivered energy price before network charges."),
         "oa_energy_price": P(4.20, "₹/kWh", DEFAULT_ASSUMPTION, "Open-access RE energy price before OA charges."),
-        "include_generation_capex": P(
-            True,
-            "",
-            DEFAULT_ASSUMPTION,
-            "If true, solar/wind/BESS CAPEX enters the cash-flow (typical for hybrid ownership). If false, generation is treated as a tariff (typical for some OA/captive contracts).",
-            kind="boolean",
-        ),
         "apply_network_charges_to_re": P(
             True,
             "",
@@ -559,10 +734,10 @@ DEFAULT_CONFIG = {
             kind="boolean",
         ),
         "apply_network_charges_to_bess": P(
-            True,
+            False,
             "",
             DEFAULT_ASSUMPTION,
-            "Apply BESS-specific transmission/wheeling/banking/other charges to annual BESS discharge energy.",
+            "BESS network charges on discharge. Forced off for Captive/Hybrid (use Storage tariff ₹/kWh).",
             kind="boolean",
         ),
         "apply_network_charges_to_grid": P(
@@ -677,50 +852,61 @@ DEFAULT_CONFIG = {
         ),
     },
     "compliance": {
-        "rpo_applicability": P(
+        "rpo_rco_applicability": P(
             "Unknown / Legal Review Required",
             "",
             CONCEPT_NOTE,
-            "RPO applicability is user-declared. The model does not infer it.",
+            "Integrated RPO/RCO applicability (purchase + consumption obligation). "
+            "User-declared — the model does not infer it.",
             kind="select",
             options=["Applicable", "Not Applicable", "Unknown / Legal Review Required"],
         ),
-        "rpo_solar_target_pct": P(0.0, "%", DEFAULT_ASSUMPTION, "Solar RPO target. The concept note does not state a numeric RPO split."),
-        "rpo_wind_target_pct": P(0.0, "%", DEFAULT_ASSUMPTION, "Wind RPO target. The concept note does not state a numeric RPO split."),
-        "rpo_hydro_target_pct": P(0.0, "%", DEFAULT_ASSUMPTION, "Hydro RPO target."),
-        "rpo_other_target_pct": P(0.0, "%", DEFAULT_ASSUMPTION, "Other-renewable RPO target."),
-        "rpo_buyout_inr_per_kwh": P(1.00, "₹/kWh", DEFAULT_ASSUMPTION, "RPO shortfall cost if applicability is Applicable."),
-        "rco_applicability": P(
-            "Unknown / Legal Review Required",
+        "rpo_rco_target_pct": P(
+            0.0,
+            "%",
+            DEFAULT_ASSUMPTION,
+            "Integrated RPO/RCO target (% of DC load that must be met from RE). "
+            "One target covers both Renewable Purchase and Consumption Obligation.",
+            minimum=0,
+            maximum=100,
+            step=0.1,
+        ),
+        "rpo_rco_compliance_route": P(
+            "Buyout",
             "",
-            CONCEPT_NOTE,
-            "RCO designated-consumer applicability requires legal review (220 kV SPV structure).",
+            DEFAULT_ASSUMPTION,
+            "How shortfall is costed if Applicable (Buyout or REC).",
             kind="select",
-            options=["Applicable", "Not Applicable", "Unknown / Legal Review Required"],
+            options=["Buyout", "REC", "Self-generation", "Unknown", "Other"],
         ),
-        "rco_target_pct": P(0.0, "%", DEFAULT_ASSUMPTION, "RCO target %. The concept note does not state a numeric RCO obligation."),
-        "rco_compliance_route": P("Unknown", "", DEFAULT_ASSUMPTION, "Intended compliance route.", kind="select", options=["Unknown", "Self-generation", "REC", "Buyout", "Other"]),
-        "rco_buyout_inr_per_kwh": P(1.50, "₹/kWh", DEFAULT_ASSUMPTION, "RCO buyout / alternative compliance cost."),
-        "rco_rec_inr_per_kwh": P(1.00, "₹/kWh", DEFAULT_ASSUMPTION, "REC cost if that route is selected."),
+        "rpo_rco_buyout_inr_per_kwh": P(
+            1.00,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "RPO/RCO shortfall buyout cost when route is Buyout (or not REC).",
+        ),
+        "rpo_rco_rec_inr_per_kwh": P(
+            1.00,
+            "₹/kWh",
+            DEFAULT_ASSUMPTION,
+            "REC cost used when RPO/RCO compliance route is REC.",
+        ),
         "eso_applicability": P(
             "Unknown / Legal Review Required",
             "",
             CONCEPT_NOTE,
-            "ESO applicability is user-declared. Trajectory values below come from the concept note.",
+            "ESO applicability is user-declared.",
             kind="select",
             options=["Applicable", "Not Applicable", "Unknown / Legal Review Required"],
         ),
-        "eso_fy2026_27_pct": P(2.5, "%", CONCEPT_NOTE, "ESO trajectory for FY2026-27 from the concept note."),
-        "eso_fy2027_28_pct": P(3.0, "%", DEFAULT_ASSUMPTION, "Linear interpolation between 2.5% (FY26-27) and 4.0% (FY29-30)."),
-        "eso_fy2028_29_pct": P(3.5, "%", DEFAULT_ASSUMPTION, "Linear interpolation between 2.5% (FY26-27) and 4.0% (FY29-30)."),
-        "eso_fy2029_30_pct": P(4.0, "%", CONCEPT_NOTE, "ESO trajectory for FY2029-30 from the concept note."),
-        "eso_active_year": P(
-            "FY2026-27",
-            "",
-            DEFAULT_ASSUMPTION,
-            "Which ESO year-target is used for the current 8,760-hour study.",
-            kind="select",
-            options=["FY2026-27", "FY2027-28", "FY2028-29", "FY2029-30"],
+        "eso_target_pct": P(
+            2.5,
+            "%",
+            CONCEPT_NOTE,
+            "Single ESO storage obligation target (% of annual DC load).",
+            minimum=0,
+            maximum=100,
+            step=0.1,
         ),
         "eso_re_origin_min_pct": P(
             85.0,
@@ -729,30 +915,33 @@ DEFAULT_CONFIG = {
             "Minimum renewable-origin share of stored energy under the ESO requirement.",
         ),
         "eso_buyout_inr_per_kwh": P(1.20, "₹/kWh", DEFAULT_ASSUMPTION, "ESO shortfall / origin-failure cost if applicable."),
-        "annual_re_target_pct": P(90.0, "%", CONCEPT_NOTE, "Selected annual RE target. Concept note prepopulates 90 / 95 / 99."),
-        "hourly_cfe_target_pct": P(90.0, "%", CONCEPT_NOTE, "Selected hourly CFE target. Concept note prepopulates 90 / 95 / 99 / 100."),
-        "cfe_pass_mode": P(
-            "All hours >= target",
-            "",
-            DEFAULT_ASSUMPTION,
-            "Pass rule for hourly CFE. Strict 24×7 interpretation: every hour's CFE must be at least the target.",
-            kind="select",
-            options=["All hours >= target", "Mean hourly CFE >= target", "Share of hours >= target"],
+        "annual_re_target_pct": P(90.0, "%", CONCEPT_NOTE, "Selected annual RE / Architecture CFE mix target."),
+        "hourly_cfe_target_pct": P(
+            90.0,
+            "%",
+            CONCEPT_NOTE,
+            "24×7 CFE target. Pass = every hour’s CFE% from "
+            "Min(Load, Load×(Architecture Solar%+Wind%+BESS%)/100) / Load × 100 "
+            "(firm contracted mix) meets this target; otherwise Fail.",
+            minimum=0,
+            maximum=100,
+            step=0.1,
         ),
-        "cfe_hour_share_target_pct": P(100.0, "%", DEFAULT_ASSUMPTION, "Used only when pass mode is 'Share of hours >= target'."),
+        "grid_emission_factor_tco2_per_mwh": P(
+            0.82,
+            "tCO2/MWh",
+            DEFAULT_ASSUMPTION,
+            "Grid emission factor for carbon accounting (baseline and DISCOM share).",
+            minimum=0,
+            step=0.01,
+        ),
     },
     "financial": {
         "project_life_yr": P(25, "yr", DEFAULT_ASSUMPTION, "Cash-flow horizon.", kind="integer", minimum=1, maximum=40),
         "discount_rate_pct": P(10.0, "%", DEFAULT_ASSUMPTION, "Real/nominal discount rate applied to cash flows as entered (no separate real/nominal conversion)."),
-        "inflation_pct": P(5.0, "%", DEFAULT_ASSUMPTION, "OPEX inflation."),
         "electricity_escalation_pct": P(4.0, "%", DEFAULT_ASSUMPTION, "Grid energy-cost escalation."),
         "re_cost_escalation_pct": P(2.0, "%", DEFAULT_ASSUMPTION, "RE tariff/OPEX escalation where billed as energy."),
-        "residual_value_pct": P(10.0, "%", DEFAULT_ASSUMPTION, "Residual value of depreciable CAPEX at horizon, credited in the final year."),
         "tax_pct": P(0.0, "%", DEFAULT_ASSUMPTION, "Optional tax on taxable income. Default 0 (pre-tax)."),
-        "financing_enabled": P(False, "", DEFAULT_ASSUMPTION, "If false, the model is 100% equity / cash CAPEX at t=0.", kind="boolean"),
-        "debt_pct": P(70.0, "%", DEFAULT_ASSUMPTION, "Debt share of CAPEX if financing is enabled."),
-        "interest_rate_pct": P(9.0, "%", DEFAULT_ASSUMPTION, "Interest on outstanding debt."),
-        "debt_tenor_yr": P(15, "yr", DEFAULT_ASSUMPTION, "Sculpted as equal principal + interest on outstanding.", kind="integer"),
         "additional_costs": P(
             [],
             "₹/yr",
@@ -760,56 +949,6 @@ DEFAULT_CONFIG = {
             "User-defined additional annual cost line items (label + amount). Included in delivered ₹/kWh and cashflows.",
             kind="list",
         ),
-    },
-    "optimization": {
-        "objective": P(
-            "Minimum Cost",
-            "",
-            CONCEPT_NOTE,
-            "Primary objective. Concept note states lowest electricity cost, subject to RE/CFE/compliance constraints.",
-            kind="select",
-            options=["Minimum Cost", "Maximum RE", "Maximum CFE", "Minimum Grid Dependency", "Compliance First", "Balanced"],
-        ),
-        "dispatch_mode": P(
-            "Rule-Based",
-            "",
-            DEFAULT_ASSUMPTION,
-            "Hourly BESS/grid dispatch method.",
-            kind="select",
-            options=["Rule-Based", "LP Dispatch"],
-        ),
-        "search_mode": P(
-            "Standard",
-            "",
-            DEFAULT_ASSUMPTION,
-            "Capacity search effort. Thorough evaluates more candidates.",
-            kind="select",
-            options=["Quick", "Standard", "Thorough"],
-        ),
-        "solar_min_mw": P(0.0, "MW", DEFAULT_ASSUMPTION, "Lower bound for solar capacity search."),
-        "solar_max_mw": P(750.0, "MW", DEFAULT_ASSUMPTION, "Upper bound for solar capacity search."),
-        "solar_step_mw": P(25.0, "MW", DEFAULT_ASSUMPTION, "Solar search step."),
-        "wind_min_mw": P(0.0, "MW", DEFAULT_ASSUMPTION, "Lower bound for wind capacity search."),
-        "wind_max_mw": P(750.0, "MW", DEFAULT_ASSUMPTION, "Upper bound for wind capacity search."),
-        "wind_step_mw": P(25.0, "MW", DEFAULT_ASSUMPTION, "Wind search step."),
-        "bess_power_min_mw": P(0.0, "MW", DEFAULT_ASSUMPTION, "Lower bound for BESS power."),
-        "bess_power_max_mw": P(400.0, "MW", DEFAULT_ASSUMPTION, "Upper bound for BESS power."),
-        "bess_energy_min_mwh": P(0.0, "MWh", DEFAULT_ASSUMPTION, "Lower bound for BESS energy."),
-        "bess_energy_max_mwh": P(2000.0, "MWh", DEFAULT_ASSUMPTION, "Upper bound for BESS energy."),
-        "grid_min_mw": P(0.0, "MW", DEFAULT_ASSUMPTION, "Lower bound for grid import capacity."),
-        "grid_max_mw": P(400.0, "MW", DEFAULT_ASSUMPTION, "Upper bound for grid import capacity."),
-        "enforce_re_target": P(True, "", DEFAULT_ASSUMPTION, "Treat annual RE target as a feasibility constraint.", kind="boolean"),
-        "enforce_cfe_target": P(False, "", DEFAULT_ASSUMPTION, "Treat hourly CFE pass rule as a feasibility constraint. Default off because strict 24×7 CFE is demanding; enable after sizing BESS.", kind="boolean"),
-        "enforce_no_unserved": P(True, "", DEFAULT_ASSUMPTION, "Require unserved energy ≈ 0.", kind="boolean"),
-        "weight_cost": P(0.40, "w", DEFAULT_ASSUMPTION, "Balanced-objective weight on cost (lower is better)."),
-        "weight_re": P(0.25, "w", DEFAULT_ASSUMPTION, "Balanced-objective weight on annual RE."),
-        "weight_cfe": P(0.25, "w", DEFAULT_ASSUMPTION, "Balanced-objective weight on hourly CFE."),
-        "weight_grid": P(0.10, "w", DEFAULT_ASSUMPTION, "Balanced-objective weight on reducing grid energy."),
-        "priority_1": P("RE to load", "", DEFAULT_ASSUMPTION, "Dispatch priority 1.", kind="select", options=["RE to load"]),
-        "priority_2": P("Excess RE charges BESS", "", DEFAULT_ASSUMPTION, "Dispatch priority 2.", kind="select", options=["Excess RE charges BESS"]),
-        "priority_3": P("Curtail remaining RE", "", DEFAULT_ASSUMPTION, "Dispatch priority 3.", kind="select", options=["Curtail remaining RE"]),
-        "priority_4": P("BESS discharges on deficit", "", DEFAULT_ASSUMPTION, "Dispatch priority 4.", kind="select", options=["BESS discharges on deficit"]),
-        "priority_5": P("Grid serves residual", "", DEFAULT_ASSUMPTION, "Dispatch priority 5.", kind="select", options=["Grid serves residual"]),
     },
 }
 
@@ -820,7 +959,8 @@ DEFAULT_SCENARIOS = []  # Architecture is chosen in Project Setup — do not see
 
 
 def get_default_config():
-    return deepcopy(DEFAULT_CONFIG)
+    cfg = deepcopy(DEFAULT_CONFIG)
+    return strip_plant_leftovers(cfg)
 
 
 def iter_params(config: dict, prefix: str = ""):
@@ -851,13 +991,355 @@ def v(config: dict, dotted: str):
     return node["value"]
 
 
+def v_opt(config: dict, dotted: str, default=None):
+    """Read a config value or return default when the path was retired / missing."""
+    try:
+        return v(config, dotted)
+    except Exception:
+        return default
+
+
 def recompute_calculated(config: dict) -> dict:
-    peak = v(config, "load.peak_load_mw")
-    lf = v(config, "load.load_factor_pct") / 100.0
-    config["load"]["base_load_mw"]["value"] = round(peak * lf, 6)
-    config["grid"]["connection_voltage_kv"]["value"] = v(config, "data_center.grid_connection_kv")
+    """Refresh calculated fields (peak, LF, stack totals, study hours, migrations)."""
+    strip_plant_leftovers(config)
+    # Project name → facility name (same label)
+    try:
+        general = config.get("general") or {}
+        dc = config.get("data_center") or {}
+        if "project_name" in general and "facility_name" in dc:
+            name = str(v(config, "general.project_name") or "")
+            dc["facility_name"]["value"] = name
+            dc["facility_name"]["source"] = CALCULATED
+            dc["facility_name"]["editable"] = False
+    except Exception:
+        pass
+
+    # Study period → model hours
+    try:
+        from backend.simulation.calendar import clamp_month, hours_in_month_range
+
+        general = config.get("general") or {}
+        if "study_start_month" in general and "study_end_month" in general:
+            sm = clamp_month(int(v(config, "general.study_start_month")))
+            em = clamp_month(int(v(config, "general.study_end_month")))
+            if sm > em:
+                em = sm
+            general["study_start_month"]["value"] = sm
+            general["study_end_month"]["value"] = em
+            auto_h = int(hours_in_month_range(sm, em, leap=False))
+            if "model_hours" in general:
+                mh = general["model_hours"]
+                if mh.get("source") == USER_INPUT:
+                    try:
+                        h = int(mh.get("value") or auto_h)
+                    except Exception:
+                        h = auto_h
+                    h = max(24, min(8784, h))
+                    mh["value"] = h
+                    if h == auto_h:
+                        mh["source"] = CALCULATED
+                else:
+                    mh["value"] = auto_h
+                    mh["source"] = CALCULATED
+            model_h = int(v(config, "general.model_hours")) if "model_hours" in general else auto_h
+            load = config.get("load") or {}
+            if "operating_hours" in load:
+                load["operating_hours"]["value"] = int(model_h)
+                load["operating_hours"]["source"] = CALCULATED
+                load["operating_hours"]["editable"] = False
+            if "study_years" in load:
+                n_months = em - sm + 1
+                load["study_years"]["value"] = round(n_months / 12.0, 6)
+                load["study_years"]["source"] = CALCULATED
+                load["study_years"]["editable"] = False
+    except Exception:
+        pass
+
+    # Force Seasonal TOD as sole load shape when present
+    try:
+        if "load_model" in config.get("load", {}):
+            config["load"]["load_model"]["value"] = "Seasonal TOD"
+            config["load"]["load_model"]["editable"] = False
+    except Exception:
+        pass
+
+    # Seasonal TOD day band: product requirement is 8AM–8PM / 8PM–8AM
+    try:
+        load = config.get("load") or {}
+        if "seasonal_tod_day_start_hour" in load and "seasonal_tod_day_end_hour" in load:
+            # Migrate mistaken recovery defaults (6–22) back to required 8–20
+            try:
+                ds = int(load["seasonal_tod_day_start_hour"].get("value"))
+                de = int(load["seasonal_tod_day_end_hour"].get("value"))
+            except Exception:
+                ds, de = 8, 20
+            if (ds, de) == (6, 22):
+                load["seasonal_tod_day_start_hour"]["value"] = 8
+                load["seasonal_tod_day_end_hour"]["value"] = 20
+                load["seasonal_tod_day_start_hour"]["source"] = CALCULATED
+                load["seasonal_tod_day_end_hour"]["source"] = CALCULATED
+    except Exception:
+        pass
+
+    # IT capacity (Data Centre) → IT load; IT × PUE → peak
+    try:
+        load = config.get("load") or {}
+        dc = config.get("data_center") or {}
+        if "it_capacity_mw" in dc and "it_load_mw" in load:
+            it = float(v(config, "data_center.it_capacity_mw"))
+            load["it_load_mw"]["value"] = round(it, 6)
+            load["it_load_mw"]["source"] = CALCULATED
+            load["it_load_mw"]["editable"] = False
+        if "it_load_mw" in load and "pue" in load:
+            it = float(v(config, "load.it_load_mw"))
+            pue = float(v(config, "load.pue"))
+            total_mw = round(it * pue, 6)
+            config["load"]["peak_load_mw"]["value"] = total_mw
+            config["load"]["peak_load_mw"]["source"] = CALCULATED
+            if config["load"]["peak_load_mw"].get("editable") is not False:
+                config["load"]["peak_load_mw"]["editable"] = False
+        else:
+            total_mw = float(v(config, "load.peak_load_mw"))
+    except Exception:
+        total_mw = float(v(config, "load.peak_load_mw"))
+
+    # Sync primary LF from scenario 1 unless SCENARIO/USER override
+    try:
+        s1 = float(v(config, "load.load_factor_s1_pct"))
+        lf_src = str(config["load"]["load_factor_pct"].get("source") or "").upper()
+        if lf_src not in ("SCENARIO", "USER"):
+            config["load"]["load_factor_pct"]["value"] = s1
+            config["load"]["load_factor_pct"]["source"] = CALCULATED
+            if config["load"]["load_factor_pct"].get("editable") is not False:
+                config["load"]["load_factor_pct"]["editable"] = False
+    except Exception:
+        pass
+
+    lf = float(v(config, "load.load_factor_pct")) / 100.0
+    config["load"]["base_load_mw"]["value"] = round(total_mw * lf, 6)
+    try:
+        config["grid"]["connection_voltage_kv"]["value"] = v(config, "data_center.grid_connection_kv")
+    except Exception:
+        pass
+
+    # DISCOM / Solar / Wind / BESS stack totals + demand ₹/kVA → ₹/MW
+    try:
+        other_vol = 0.0
+        try:
+            other_vol = float(v(config, "grid.excel_discom_other_volumetric_inr_per_kwh"))
+        except Exception:
+            other_vol = 0.0
+        discom_total = (
+            float(v(config, "grid.excel_discom_energy_inr_per_kwh"))
+            + float(v(config, "grid.excel_discom_wheeling_inr_per_kwh"))
+            + float(v(config, "grid.excel_discom_tod_inr_per_kwh"))
+            + float(v(config, "grid.excel_discom_ed_inr_per_kwh"))
+            + float(v(config, "grid.excel_discom_tose_inr_per_kwh"))
+            + other_vol
+        )
+        if "excel_discom_total_inr_per_kwh" in config.get("grid", {}):
+            config["grid"]["excel_discom_total_inr_per_kwh"]["value"] = round(discom_total, 6)
+            config["grid"]["excel_discom_total_inr_per_kwh"]["source"] = CALCULATED
+    except Exception:
+        pass
+    try:
+        grid = config.get("grid") or {}
+        if "demand_charge_inr_per_kva_month" in grid and "demand_charge_inr_per_mw_month" in grid:
+            kva = float(v(config, "grid.demand_charge_inr_per_kva_month"))
+            grid["demand_charge_inr_per_mw_month"]["value"] = round(kva * 1000.0, 6)
+            grid["demand_charge_inr_per_mw_month"]["source"] = CALCULATED
+            grid["demand_charge_inr_per_mw_month"]["editable"] = False
+    except Exception:
+        pass
+    try:
+        for asset in ("solar", "wind", "bess"):
+            total_key = f"excel_{asset}_total_inr_per_kwh"
+            if total_key not in config.get("commercial", {}):
+                continue
+            parts = [
+                f"excel_{asset}_ppa_inr_per_kwh",
+                f"excel_{asset}_energy_inr_per_kwh",
+                f"excel_{asset}_wheeling_inr_per_kwh",
+                f"excel_{asset}_transmission_inr_per_kwh",
+                f"excel_{asset}_transmission_loss_inr_per_kwh",
+                f"excel_{asset}_css_inr_per_kwh",
+                f"excel_{asset}_as_inr_per_kwh",
+                f"excel_{asset}_sldc_inr_per_kwh",
+                f"excel_{asset}_banking_inr_per_kwh",
+                f"excel_{asset}_ed_inr_per_kwh",
+                f"excel_{asset}_tose_inr_per_kwh",
+            ]
+            s = 0.0
+            for k in parts:
+                try:
+                    s += float(v(config, f"commercial.{k}"))
+                except Exception:
+                    pass
+            config["commercial"][total_key]["value"] = round(s, 6)
+            config["commercial"][total_key]["source"] = CALCULATED
+    except Exception:
+        pass
+
+    # Architecture flags + mix before syncing legacy RE/grid aliases
+    _normalize_architecture_flags(config)
+    ensure_architecture_mix_sums_to_100(config)
+
+    # Architecture mix aliases
+    try:
+        commercial = config.get("commercial") or {}
+        g = float(v(config, "commercial.mix_discom_pct")) if commercial.get("include_discom", {}).get("value", True) else 0.0
+        s = float(v(config, "commercial.mix_solar_pct")) if commercial.get("include_solar", {}).get("value", True) else 0.0
+        w = float(v(config, "commercial.mix_wind_pct")) if commercial.get("include_wind", {}).get("value", True) else 0.0
+        b = float(v(config, "commercial.mix_bess_pct")) if commercial.get("include_bess", {}).get("value", True) else 0.0
+        if "grid_power_pct" in commercial:
+            commercial["grid_power_pct"]["value"] = g
+            commercial["grid_power_pct"]["source"] = CALCULATED
+            commercial["grid_power_pct"]["editable"] = False
+        if "captive_re_pct" in commercial:
+            commercial["captive_re_pct"]["value"] = s + w + b
+            commercial["captive_re_pct"]["source"] = CALCULATED
+            commercial["captive_re_pct"]["editable"] = False
+    except Exception:
+        pass
+
+    # Captive/Hybrid: BESS OA lines unused; single Storage tariff stays editable (PPA key).
+    try:
+        structure = str(v(config, "commercial.structure") or "")
+        commercial = config.get("commercial") or {}
+        commercial.pop("include_generation_capex", None)  # obsolete: tariff stacks only
+        if structure in ("CAPTIVE", "HYBRID"):
+            if "apply_network_charges_to_bess" in commercial:
+                commercial["apply_network_charges_to_bess"]["value"] = False
+                commercial["apply_network_charges_to_bess"]["source"] = CALCULATED
+            # Keep excel_bess_ppa as the single Storage ₹/kWh input
+            if "excel_bess_ppa_inr_per_kwh" in commercial:
+                commercial["excel_bess_ppa_inr_per_kwh"]["editable"] = True
+                commercial["excel_bess_ppa_inr_per_kwh"]["description"] = (
+                    "Storage tariff (₹/kWh) — consumer fixed rate for BESS % of power. "
+                    "No BESS CAPEX/OPEX; enter the contracted ₹/kWh."
+                )
+            for key in (
+                "excel_bess_energy_inr_per_kwh",
+                "excel_bess_wheeling_inr_per_kwh",
+                "excel_bess_transmission_inr_per_kwh",
+                "excel_bess_transmission_loss_inr_per_kwh",
+                "excel_bess_css_inr_per_kwh",
+                "excel_bess_as_inr_per_kwh",
+                "excel_bess_sldc_inr_per_kwh",
+                "excel_bess_banking_inr_per_kwh",
+                "excel_bess_ed_inr_per_kwh",
+                "excel_bess_tose_inr_per_kwh",
+            ):
+                if key not in commercial:
+                    continue
+                commercial[key]["value"] = 0.0
+                commercial[key]["source"] = CALCULATED
+                commercial[key]["editable"] = False
+            if "excel_bess_total_inr_per_kwh" in commercial and "excel_bess_ppa_inr_per_kwh" in commercial:
+                try:
+                    commercial["excel_bess_total_inr_per_kwh"]["value"] = round(
+                        float(commercial["excel_bess_ppa_inr_per_kwh"].get("value") or 0.0), 6
+                    )
+                except Exception:
+                    commercial["excel_bess_total_inr_per_kwh"]["value"] = 0.0
+                commercial["excel_bess_total_inr_per_kwh"]["source"] = CALCULATED
+                commercial["excel_bess_total_inr_per_kwh"]["editable"] = False
+    except Exception:
+        pass
+
+    # Migrate legacy RPO/RCO splits → integrated
+    try:
+        comp = config.get("compliance") or {}
+        legacy_split = 0.0
+        for key in (
+            "rpo_solar_target_pct",
+            "rpo_wind_target_pct",
+            "rpo_hydro_target_pct",
+            "rpo_other_target_pct",
+        ):
+            if key in comp:
+                try:
+                    legacy_split += float(comp[key].get("value") or 0.0)
+                except Exception:
+                    pass
+        if "rpo_rco_target_pct" in comp:
+            cur = float(comp["rpo_rco_target_pct"].get("value") or 0.0)
+            legacy_tgt = 0.0
+            for key in ("rpo_target_pct", "rco_target_pct"):
+                if key in comp:
+                    try:
+                        legacy_tgt = max(legacy_tgt, float(comp[key].get("value") or 0.0))
+                    except Exception:
+                        pass
+            pick = max(legacy_tgt, legacy_split)
+            if cur == 0.0 and pick > 0.0:
+                comp["rpo_rco_target_pct"]["value"] = pick
+                comp["rpo_rco_target_pct"]["source"] = CALCULATED
+        for key in (
+            "rpo_solar_target_pct",
+            "rpo_wind_target_pct",
+            "rpo_hydro_target_pct",
+            "rpo_other_target_pct",
+            "rpo_applicability",
+            "rpo_target_pct",
+            "rpo_buyout_inr_per_kwh",
+            "rco_applicability",
+            "rco_target_pct",
+            "rco_compliance_route",
+            "rco_buyout_inr_per_kwh",
+            "rco_rec_inr_per_kwh",
+            "eso_fy2026_27_pct",
+            "eso_fy2027_28_pct",
+            "eso_fy2028_29_pct",
+            "eso_fy2029_30_pct",
+            "eso_active_year",
+            "cfe_pass_mode",
+            "cfe_hour_share_target_pct",
+            "enforce_cfe_target",
+        ):
+            comp.pop(key, None)
+        if "eso_target_pct" not in comp and "eso_applicability" in comp:
+            from copy import deepcopy as _dc
+            defaults = get_default_config()
+            if "eso_target_pct" in defaults.get("compliance", {}):
+                comp["eso_target_pct"] = _dc(defaults["compliance"]["eso_target_pct"])
+    except Exception:
+        pass
+
     return config
 
+
+# Plant / owner leftovers — removed from buyer config (strip on load for old .pto.zip).
+RETIRED_SECTIONS = ("bess", "optimization", "scenarios")
+
+RETIRED_KEYS: dict[str, tuple[str, ...]] = {
+    "solar": (
+        "capacity_mw",
+        "degradation_pct",
+        "project_life_yr",
+        "capex_inr_per_mw",
+        "opex_inr_per_mw_year",
+        "energy_cost_inr_per_kwh",
+    ),
+    "wind": (
+        "capacity_mw",
+        "degradation_pct",
+        "project_life_yr",
+        "capex_inr_per_mw",
+        "opex_inr_per_mw_year",
+        "energy_cost_inr_per_kwh",
+    ),
+    "grid": ("max_import_mw",),
+    "financial": (
+        "inflation_pct",
+        "residual_value_pct",
+        "financing_enabled",
+        "debt_pct",
+        "interest_rate_pct",
+        "debt_tenor_yr",
+    ),
+    "bess": (),  # whole section retired
+}
 
 _OBSOLETE_BESS_KEYS = (
     "charge_efficiency_pct",
@@ -865,7 +1347,42 @@ _OBSOLETE_BESS_KEYS = (
     "round_trip_efficiency_pct",
     "max_charge_mw",
     "max_discharge_mw",
+    "power_mw",
+    "energy_mwh",
+    "initial_soc_pct",
+    "min_soc_pct",
+    "max_soc_pct",
+    "calendar_degradation_pct",
+    "cycle_degradation_pct",
+    "capex_inr_per_mw",
+    "capex_inr_per_mwh",
+    "opex_inr_per_year",
+    "project_life_yr",
+    "replacement_year",
+    "replacement_cost_pct",
+    "allow_grid_charge",
 )
+
+
+def strip_plant_leftovers(config: dict) -> dict:
+    """Delete generation-plant leftovers from config (buyer = contracted energy only)."""
+    for section in RETIRED_SECTIONS:
+        config.pop(section, None)
+    for section, keys in RETIRED_KEYS.items():
+        sec = config.get(section)
+        if not isinstance(sec, dict):
+            continue
+        for key in keys:
+            sec.pop(key, None)
+        if section == "bess":
+            config.pop("bess", None)
+    bess = config.get("bess")
+    if isinstance(bess, dict):
+        for key in _OBSOLETE_BESS_KEYS:
+            bess.pop(key, None)
+        if not bess:
+            config.pop("bess", None)
+    return config
 
 
 _MIX_PCT_BY_INCLUDE = {
@@ -942,6 +1459,11 @@ def _normalize_architecture_flags(config: dict) -> None:
         return
     structure_p = commercial.get("structure")
     structure = str(structure_p.get("value", "HYBRID")) if isinstance(structure_p, dict) else "HYBRID"
+    # Legacy OPEN_ACCESS behaves like HYBRID (same asset flags + mix rules)
+    if structure == "OPEN_ACCESS":
+        structure = "HYBRID"
+        if isinstance(structure_p, dict) and "value" in structure_p:
+            structure_p["value"] = "HYBRID"
 
     def set_flag(key: str, val: bool) -> None:
         p = commercial.get(key)
@@ -956,6 +1478,68 @@ def _normalize_architecture_flags(config: dict) -> None:
     elif structure == "CAPTIVE":
         # Captive: Solar / Wind / BESS only — DISCOM is not an option
         set_flag("include_discom", False)
+
+
+def _apply_first_time_structure_includes(commercial: dict, structure: str) -> None:
+    """Sensible include_* defaults when no per-architecture memory exists yet."""
+
+    def set_flag(key: str, val: bool) -> None:
+        p = commercial.get(key)
+        if isinstance(p, dict) and "value" in p:
+            p["value"] = val
+
+    if structure == "DISCOM":
+        set_flag("include_discom", True)
+        set_flag("include_solar", False)
+        set_flag("include_wind", False)
+        set_flag("include_bess", False)
+    elif structure == "CAPTIVE":
+        set_flag("include_discom", False)
+        set_flag("include_solar", True)
+        set_flag("include_wind", True)
+        set_flag("include_bess", True)
+    else:
+        set_flag("include_discom", True)
+        set_flag("include_solar", True)
+        set_flag("include_wind", True)
+        set_flag("include_bess", True)
+
+
+def apply_architecture_profile(config: dict, structure: str) -> dict:
+    """Apply saved per-architecture edits (mix %, assets, commercial) then set structure.
+
+    Used by architecture comparison so each column uses that architecture's user-saved
+    profile from ``config["_architecture_memory"]``, not only the currently selected structure.
+    Shared Setup values (load, solar capacity, tariffs, etc.) remain from the project config.
+    """
+    structure = str(structure or "HYBRID")
+    commercial = config.get("commercial")
+    if not isinstance(commercial, dict):
+        return config
+
+    mem = config.get("_architecture_memory")
+    snap = mem.get(structure) if isinstance(mem, dict) else None
+    if isinstance(snap, dict) and snap:
+        for key, saved in snap.items():
+            p = commercial.get(key)
+            if not isinstance(p, dict) or "value" not in p:
+                continue
+            if isinstance(saved, dict) and "value" in saved:
+                p["value"] = saved["value"]
+                if saved.get("source"):
+                    p["source"] = saved["source"]
+            else:
+                p["value"] = saved
+    else:
+        _apply_first_time_structure_includes(commercial, structure)
+
+    structure_p = commercial.get("structure")
+    if isinstance(structure_p, dict) and "value" in structure_p:
+        structure_p["value"] = structure
+
+    _normalize_architecture_flags(config)
+    ensure_architecture_mix_sums_to_100(config)
+    return config
 
 
 def merge_missing_defaults(config: dict) -> dict:
@@ -973,11 +1557,17 @@ def merge_missing_defaults(config: dict) -> dict:
             if key not in config[section]:
                 config[section][key] = deepcopy(param)
                 newly_added.append((section, key))
-    # Drop retired BESS fields so they no longer appear in Setup / Assumptions
-    bess = config.get("bess")
-    if isinstance(bess, dict):
-        for key in _OBSOLETE_BESS_KEYS:
-            bess.pop(key, None)
+    strip_plant_leftovers(config)
+    for section in ("compliance", "optimization"):
+        sec = config.get(section)
+        if isinstance(sec, dict):
+            sec.pop("enforce_cfe_target", None)
+    commercial = config.get("commercial")
+    if isinstance(commercial, dict):
+        commercial.pop("include_generation_capex", None)
+    load = config.get("load")
+    if isinstance(load, dict):
+        load.pop("growth_rate_pct", None)
     _seed_re_network_from_grid(config, newly_added)
     _seed_solar_wind_network_from_re(config, newly_added)
     _normalize_architecture_flags(config)
@@ -1117,14 +1707,41 @@ CRITICAL_DEFAULT_PATHS = (
     "solar.capacity_factor_pct",
     "wind.capacity_factor_pct",
     "grid.energy_tariff_inr_per_kwh",
-    "solar.capex_inr_per_mw",
-    "wind.capex_inr_per_mw",
-    "bess.capex_inr_per_mwh",
-    "solar.opex_inr_per_mw_year",
-    "compliance.rpo_applicability",
-    "compliance.rco_applicability",
+    "compliance.rpo_rco_applicability",
     "compliance.eso_applicability",
 )
+
+# Safety net: never show retired plant keys if an old project still carries them.
+PLANT_LEFTOVER_PATHS = frozenset()
+PLANT_LEFTOVER_PREFIXES = (
+    "optimization.",
+    "scenarios.",
+    "bess.",
+    "solar.capacity_mw",
+    "solar.capex_",
+    "solar.opex_",
+    "solar.project_life",
+    "solar.energy_cost",
+    "solar.degradation",
+    "wind.capacity_mw",
+    "wind.capex_",
+    "wind.opex_",
+    "wind.project_life",
+    "wind.energy_cost",
+    "wind.degradation",
+    "grid.max_import_mw",
+    "financial.financing",
+    "financial.debt_",
+    "financial.interest_rate",
+    "financial.residual_value",
+    "financial.inflation",
+)
+
+
+def is_plant_leftover_path(path: str) -> bool:
+    if path in PLANT_LEFTOVER_PATHS:
+        return True
+    return any(path.startswith(p) for p in PLANT_LEFTOVER_PREFIXES)
 
 
 def critical_default_assumptions(config: dict) -> list[str]:
@@ -1143,6 +1760,8 @@ def critical_default_assumptions(config: dict) -> list[str]:
 def flatten_assumptions(config: dict) -> list[dict]:
     rows = []
     for path, param in iter_params(config):
+        if is_plant_leftover_path(path):
+            continue
         rows.append(
             {
                 "parameter": path,

@@ -149,7 +149,7 @@ def write_access_file(info: dict) -> Path | None:
         from backend.paths import data_dir, install_dir
 
         lines = [
-            "PowerTrain Optimizer — access addresses",
+            "Data Center PowerTrain — access addresses",
             "========================================",
             "",
             f"This PC (browser on the same laptop):  {info['local_url']}",
@@ -302,8 +302,11 @@ def wait_until_ready(url: str, timeout: float = 45.0) -> bool:
     return False
 
 
-def _watchdog(grace_sec: float = 45.0, first_beat_timeout: float = 90.0):
-    """Exit when the UI stops heartbeating (tab closed / Quit / crashed browser)."""
+def _watchdog(grace_sec: float = 300.0, first_beat_timeout: float = 90.0):
+    """Exit when the UI stops heartbeating (tab closed / Quit / crashed browser).
+
+    grace_sec: how long after the last heartbeat before the process exits (default 5 minutes).
+    """
     wait_deadline = time.monotonic() + first_beat_timeout
     while not _shutdown_requested.is_set() and not _heartbeat_started:
         if time.monotonic() > wait_deadline:
@@ -447,7 +450,7 @@ def main():
         open_ui_window(existing)
         return
 
-    log.info("Starting PowerTrain Optimizer")
+    log.info("Starting Data Center PowerTrain")
     initialize_database()
 
     host = bind_host()
@@ -487,7 +490,7 @@ def main():
 
     threading.Thread(target=open_when_ready, daemon=True).start()
     # Always watch UI heartbeats: Quit App or closing tabs stops the background process.
-    threading.Thread(target=_watchdog, kwargs={"grace_sec": 45.0}, daemon=True).start()
+    threading.Thread(target=_watchdog, kwargs={"grace_sec": 300.0}, daemon=True).start()
 
     log.info("Listening on %s (bind %s:%s)", local_url, host, port)
     for u in info.get("lan_urls") or []:
@@ -495,7 +498,7 @@ def main():
     try:
         _server.run()
     finally:
-        log.info("PowerTrain Optimizer stopped")
+        log.info("Data Center PowerTrain stopped")
         os._exit(0)
 
 

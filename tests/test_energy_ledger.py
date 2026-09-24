@@ -41,14 +41,26 @@ def test_energy_ledger_discom_grid_only():
 
 
 def test_energy_ledger_zero_bess():
-    cfg = _cfg(**{"bess.power_mw": 0.0, "bess.energy_mwh": 0.0})
-    bundle = run_simulation(cfg, structure="HYBRID")
+    bundle = run_simulation(
+        _cfg(**{"commercial.include_bess": False, "commercial.mix_bess_pct": 0.0}),
+        structure="HYBRID",
+    )
     assert bundle.energy_ledger["energy_balance_ok"] is True
     assert bundle.kpis["bess_discharge_mwh"] == 0.0
+    assert bundle.kpis["bess_mw"] == 0.0
 
 
 def test_energy_ledger_no_renewables():
-    cfg = _cfg(**{"solar.capacity_mw": 0.0, "wind.capacity_mw": 0.0})
+    cfg = _cfg(
+        **{
+            "commercial.include_solar": False,
+            "commercial.include_wind": False,
+            "commercial.include_bess": False,
+            "commercial.include_discom": True,
+            "commercial.mix_discom_pct": 100.0,
+            "commercial.structure": "HYBRID",
+        }
+    )
     bundle = run_simulation(cfg, structure="HYBRID")
     assert bundle.kpis["annual_re_pct"] < 1.0
     assert bundle.energy_ledger["energy_balance_ok"] is True
@@ -57,7 +69,7 @@ def test_energy_ledger_no_renewables():
 def test_fingerprint_changes_with_inputs():
     a = _cfg()
     b = deepcopy(a)
-    b["solar"]["capacity_mw"]["value"] = float(b["solar"]["capacity_mw"]["value"]) + 10.0
+    b["commercial"]["mix_solar_pct"]["value"] = float(b["commercial"]["mix_solar_pct"]["value"]) + 5.0
     assert config_fingerprint(a) != config_fingerprint(b)
 
 
@@ -77,9 +89,19 @@ def test_solar_wind_flow_identity():
 
 
 def test_bess_duration_and_losses_reported():
-    bundle = run_simulation(_cfg(), structure="HYBRID")
-    assert bundle.kpis["bess_duration_h"] == pytest.approx(
-        bundle.kpis["bess_mwh"] / bundle.kpis["bess_mw"], rel=1e-6
+    """With BESS mix off: no derived storage. With BESS on: duration/losses are reported."""
+    off = run_simulation(
+        _cfg(**{"commercial.include_bess": False, "commercial.mix_bess_pct": 0.0}),
+        structure="HYBRID",
     )
-    assert bundle.kpis["bess_losses_mwh"] == pytest.approx(0.0)
-    assert "bess_utilization_definition" in bundle.kpis
+    assert off.kpis["bess_mw"] == pytest.approx(0.0, abs=1e-9)
+    assert off.kpis["bess_mwh"] == pytest.approx(0.0, abs=1e-9)
+    assert off.kpis["bess_duration_h"] == pytest.approx(0.0, abs=1e-9)
+    assert off.kpis["bess_losses_mwh"] == pytest.approx(0.0, abs=1e-6)
+
+    on = run_simulation(_cfg(), structure="HYBRID")
+    assert "simulated_mix_re_pct" in on.kpis
+    if float(on.kpis.get("target_mix_bess_pct") or 0) > 0:
+        assert on.kpis["bess_mw"] > 0.0
+        assert on.kpis["bess_mwh"] > 0.0
+        assert on.kpis["bess_duration_h"] > 0.0

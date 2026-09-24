@@ -6,8 +6,22 @@ from functools import lru_cache
 
 import numpy as np
 
-from backend.simulation.calendar import HOURS, get_calendar
-from config.defaults import v
+from backend.simulation.calendar import HOURS, get_calendar, hours_in_month_range
+from config.defaults import v, v_opt
+
+
+def _calendar_for(config: dict, hours: int):
+    """Prefer study month range when hours match; else fall back to hours-based calendar."""
+    try:
+        sm = int(v(config, "general.study_start_month"))
+        em = int(v(config, "general.study_end_month"))
+        if hours == hours_in_month_range(sm, em, leap=False):
+            return get_calendar(start_month=sm, end_month=em, leap=False)
+        if hours == 8784 and sm == 1 and em == 12:
+            return get_calendar(start_month=1, end_month=12, leap=True)
+    except Exception:
+        pass
+    return get_calendar(hours)
 
 
 def _month_factors(section: dict, prefix: str) -> np.ndarray:
@@ -33,46 +47,92 @@ def _season_factors_12(section: dict, legacy_prefix: str | None = None) -> np.nd
     return np.ones(12, dtype=float)
 
 
+def _parse_month_list(raw: str, fallback: list[int]) -> list[int]:
+    out: list[int] = []
+    for part in str(raw or "").replace(";", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            m = int(part)
+        except ValueError:
+            continue
+        if 1 <= m <= 12:
+            out.append(m)
+    return out or list(fallback)
+
+
+def _seasonal_tod_shape(config: dict, cal) -> np.ndarray:
+    """Season (Summer/Rainy/Winter) × TOD day/night × weekday/weekend multipliers."""
+    summer_m = set(_parse_month_list(str(v(config, "load.seasonal_tod_summer_months")), [3, 4, 5]))
+    rainy_m = set(_parse_month_list(str(v(config, "load.seasonal_tod_rainy_months")), [6, 7, 8, 9]))
+    winter_m = set(_parse_month_list(str(v(config, "load.seasonal_tod_winter_months")), [10, 11, 12, 1, 2]))
+    day_start = int(v(config, "load.seasonal_tod_day_start_hour"))
+    day_end = int(v(config, "load.seasonal_tod_day_end_hour"))
+    if day_end <= day_start:
+        day_start, day_end = 8, 20
+
+    mult = {
+        "summer": (
+            float(v(config, "load.seasonal_tod_summer_day")),
+            float(v(config, "load.seasonal_tod_summer_night")),
+        ),
+        "rainy": (
+            float(v(config, "load.seasonal_tod_rainy_day")),
+            float(v(config, "load.seasonal_tod_rainy_night")),
+        ),
+        "winter": (
+            float(v(config, "load.seasonal_tod_winter_day")),
+            float(v(config, "load.seasonal_tod_winter_night")),
+        ),
+    }
+    try:
+        wd = float(v(config, "load.weekday_multiplier"))
+    except Exception:
+        wd = 1.0
+    try:
+        we = float(v(config, "load.weekend_multiplier"))
+    except Exception:
+        we = 1.0
+
+    shape = np.ones(cal.hours, dtype=float)
+    for t in range(cal.hours):
+        month = int(cal.month[t]) + 1  # calendar stores 0..11
+        hod = int(cal.hour_of_day[t])
+        if month in summer_m:
+            season = "summer"
+        elif month in rainy_m:
+            season = "rainy"
+        elif month in winter_m:
+            season = "winter"
+        else:
+            season = "winter"
+        is_day = day_start <= hod < day_end
+        day_m, night_m = mult[season]
+        tod = day_m if is_day else night_m
+        day_type = wd if int(cal.weekday[t]) < 5 else we
+        shape[t] = tod * day_type
+    return shape
+
+
 def generate_load(config: dict, hours: int = HOURS) -> dict:
-    cal = get_calendar(hours)
+    cal = _calendar_for(config, hours)
+    hours = cal.hours
     peak = float(v(config, "load.peak_load_mw"))
     lf = float(v(config, "load.load_factor_pct")) / 100.0
-    model = str(v(config, "load.load_model"))
     operating = int(v(config, "load.operating_hours"))
 
-    shape = np.ones(hours, dtype=float)
-
-    if model in ("Daily Pattern", "Custom Parameterized", "Weekday/Weekend", "Seasonal"):
-        hour_mult = np.array(
-            [float(config["load"][f"hour_multiplier_{h}"]["value"]) for h in range(24)],
-            dtype=float,
-        )
-        if model != "Weekday/Weekend" or True:
-            if model in ("Daily Pattern", "Custom Parameterized", "Seasonal"):
-                shape *= hour_mult[cal.hour_of_day]
-
-    if model in ("Weekday/Weekend", "Custom Parameterized"):
-        wd = float(v(config, "load.weekday_multiplier"))
-        we = float(v(config, "load.weekend_multiplier"))
-        shape *= np.where(cal.weekday < 5, wd, we)
-
-    if model in ("Seasonal", "Custom Parameterized"):
-        month_mult = _month_factors(config["load"], "month_multiplier_")
-        shape *= month_mult[cal.month]
-
-    if model == "Flat":
-        load = np.full(hours, peak * lf, dtype=float)
-    else:
-        avg = peak * lf
-        if shape.mean() <= 0:
-            shape = np.ones(hours, dtype=float)
-        load = shape / shape.mean() * avg
-        if load.max() > peak + 1e-9 and load.max() != load.mean():
-            # Compress peaks toward average so max == peak while preserving mean if possible
-            avg_now = load.mean()
-            if load.max() > avg_now:
-                load = avg_now + (load - avg_now) * (peak - avg_now) / (load.max() - avg_now)
-        load = np.clip(load, 0.0, None)
+    # Sole product load shape: Seasonal TOD (+ weekday/weekend)
+    shape = _seasonal_tod_shape(config, cal)
+    avg = peak * lf
+    if shape.mean() <= 0:
+        shape = np.ones(hours, dtype=float)
+    load = shape / shape.mean() * avg
+    if load.max() > peak + 1e-9 and load.max() != load.mean():
+        avg_now = load.mean()
+        if load.max() > avg_now:
+            load = avg_now + (load - avg_now) * (peak - avg_now) / (load.max() - avg_now)
+    load = np.clip(load, 0.0, None)
 
     if operating < hours:
         load[operating:] = 0.0
@@ -102,8 +162,11 @@ def _scale_to_cf(raw: np.ndarray, capacity: float, cf: float) -> np.ndarray:
 
 
 def generate_solar(config: dict, hours: int = HOURS, capacity_override: float | None = None) -> dict:
-    cal = get_calendar(hours)
-    capacity = float(capacity_override if capacity_override is not None else v(config, "solar.capacity_mw"))
+    cal = _calendar_for(config, hours)
+    hours = cal.hours
+    capacity = float(capacity_override if capacity_override is not None else v_opt(config, "solar.capacity_mw", 1.0) or 1.0)
+    if capacity <= 0:
+        capacity = 1.0
     cf = float(v(config, "solar.capacity_factor_pct")) / 100.0
     sunrise = float(v(config, "solar.sunrise_hour"))
     sunset = float(v(config, "solar.sunset_hour"))
@@ -138,8 +201,11 @@ def generate_solar(config: dict, hours: int = HOURS, capacity_override: float | 
 
 
 def generate_wind(config: dict, hours: int = HOURS, capacity_override: float | None = None) -> dict:
-    cal = get_calendar(hours)
-    capacity = float(capacity_override if capacity_override is not None else v(config, "wind.capacity_mw"))
+    cal = _calendar_for(config, hours)
+    hours = cal.hours
+    capacity = float(capacity_override if capacity_override is not None else v_opt(config, "wind.capacity_mw", 1.0) or 1.0)
+    if capacity <= 0:
+        capacity = 1.0
     cf = float(v(config, "wind.capacity_factor_pct")) / 100.0
     variability = float(v(config, "wind.hourly_variability"))
     seed = int(v(config, "general.random_seed"))

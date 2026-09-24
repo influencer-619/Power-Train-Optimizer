@@ -27,6 +27,8 @@ def validate_config(config: dict) -> list[dict]:
     if base > peak + 1e-6:
         warn("Base load exceeds peak load after calculation.")
 
+    # Plant MW/MWh are not buyer inputs (DC consumes contracted energy at fixed rates).
+    # Keep non-negative checks only if keys still exist in config.
     for name, path in [
         ("Solar capacity", "solar.capacity_mw"),
         ("Wind capacity", "wind.capacity_mw"),
@@ -34,8 +36,11 @@ def validate_config(config: dict) -> list[dict]:
         ("BESS energy", "bess.energy_mwh"),
         ("Grid max import", "grid.max_import_mw"),
     ]:
-        if float(v(config, path)) < 0:
-            err(f"{name} must be >= 0.")
+        try:
+            if float(v(config, path)) < 0:
+                err(f"{name} must be >= 0.")
+        except Exception:
+            pass
 
     for label, path in [
         ("Initial SOC", "bess.initial_soc_pct"),
@@ -63,25 +68,29 @@ def validate_config(config: dict) -> list[dict]:
                 pass
         if abs(mix_total - 100.0) > 0.05:
             err(
-                f"Asset usage % for selected assets must sum to 100 "
+                f"Percentage of power for selected assets must sum to 100 "
                 f"(currently {mix_total:.2f}%)."
             )
 
-    if float(v(config, "bess.min_soc_pct")) > float(v(config, "bess.max_soc_pct")):
-        err("Minimum SOC must be <= Maximum SOC.")
-    if not (
-        float(v(config, "bess.min_soc_pct"))
-        <= float(v(config, "bess.initial_soc_pct"))
-        <= float(v(config, "bess.max_soc_pct"))
-    ):
-        err("Initial SOC must lie between Min and Max SOC.")
-
-    if float(v(config, "solar.sunrise_hour")) >= float(v(config, "solar.sunset_hour")):
-        err("Sunrise hour must be < sunset hour.")
+    # Plant SOC / capacity checks removed — BESS is Storage tariff + mix % only.
+    try:
+        if float(v(config, "solar.sunrise_hour")) >= float(v(config, "solar.sunset_hour")):
+            err("Sunrise hour must be < sunset hour.")
+    except Exception:
+        pass
 
     hours = int(v(config, "general.model_hours"))
-    if hours not in (8760, 8784):
-        err("Model hours must be 8760 or 8784.")
+    if hours < 24 or hours > 8784:
+        err("Model hours must be between 24 and 8784.")
+    try:
+        sm = int(v(config, "general.study_start_month"))
+        em = int(v(config, "general.study_end_month"))
+        if not (1 <= sm <= 12 and 1 <= em <= 12):
+            err("Study start/end month must be between 1 and 12.")
+        elif sm > em:
+            err("Study start month must be ≤ end month.")
+    except Exception:
+        pass
 
     return issues
 
@@ -92,12 +101,17 @@ def validate_dispatch(d, config: dict) -> dict:
     fail_idx = np.where(abs_err > tol)[0]
     ok = len(fail_idx) == 0
 
-    soc_min = float(v(config, "bess.min_soc_pct")) / 100.0 * float(d.meta.get("bess_energy_mwh") or 0.0)
-    soc_max = float(v(config, "bess.max_soc_pct")) / 100.0 * float(d.meta.get("bess_energy_mwh") or 0.0)
     energy = float(d.meta.get("bess_energy_mwh") or 0.0)
     soc_ok = True
     if energy > 0:
-        soc_ok = bool(np.all(d.soc_mwh >= soc_min - 1e-3) and np.all(d.soc_mwh <= soc_max + 1e-3))
+        try:
+            from config.defaults import v_opt
+
+            soc_min = float(v_opt(config, "bess.min_soc_pct", 10.0) or 10.0) / 100.0 * energy
+            soc_max = float(v_opt(config, "bess.max_soc_pct", 95.0) or 95.0) / 100.0 * energy
+            soc_ok = bool(np.all(d.soc_mwh >= soc_min - 1e-3) and np.all(d.soc_mwh <= soc_max + 1e-3))
+        except Exception:
+            soc_ok = True
 
     grid_cap = float(d.meta.get("grid_cap_effective_mw") or d.meta.get("grid_cap_mw") or 0.0)
     grid_ok = bool(np.all(d.grid_mw <= grid_cap + 1e-3))

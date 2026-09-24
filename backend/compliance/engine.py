@@ -16,33 +16,30 @@ def _status(applicability: str, pass_: bool | None) -> str:
 
 
 def evaluate_cfe(config: dict, kpis: dict) -> dict:
+    """Pass/fail from the 24×7 CFE formula vs hourly target.
+
+    Carbon-free supply follows Architecture mix (Solar% + Wind% + BESS%) × load
+    each hour — contracted firm delivery, not plant shapes.
+    Pass only if every hour meets ``hourly_cfe_target_pct`` (min hourly CFE ≥ target).
+    """
+    from backend.compliance.cfe_analytics import CFE_FORMULA
+
     target = float(v(config, "compliance.hourly_cfe_target_pct"))
-    mode = str(v(config, "compliance.cfe_pass_mode"))
     actual_mean = float(kpis["hourly_cfe_mean_pct"])
     actual_min = float(kpis["hourly_cfe_min_pct"])
     hours_meet = float(kpis["hours_meeting_cfe_target_pct"])
-    share_target = float(v(config, "compliance.cfe_hour_share_target_pct"))
-
-    if mode == "All hours >= target":
-        passed = hours_meet >= 100.0 - 1e-9
-        actual = actual_min
-    elif mode == "Mean hourly CFE >= target":
-        passed = actual_mean >= target - 1e-9
-        actual = actual_mean
-    else:
-        passed = hours_meet >= share_target - 1e-9
-        actual = hours_meet
-
+    passed = actual_min >= target - 1e-9 and hours_meet >= 100.0 - 1e-9
     return {
         "metric": "Hourly CFE",
         "target_pct": target,
-        "actual_pct": actual,
+        "actual_pct": actual_min,
         "mean_pct": actual_mean,
         "min_pct": actual_min,
         "hours_meeting_pct": hours_meet,
-        "pass_mode": mode,
+        "pass_mode": "CFE formula (all hours ≥ target)",
+        "formula": CFE_FORMULA,
         "status": "Pass" if passed else "Fail",
-        "gap_pct": max(0.0, target - actual) if mode != "Share of hours >= target" else max(0.0, share_target - hours_meet),
+        "gap_pct": max(0.0, target - actual_min),
     }
 
 
@@ -58,76 +55,213 @@ def evaluate_re(config: dict, kpis: dict) -> dict:
     }
 
 
-def evaluate_rpo(config: dict, kpis: dict) -> dict:
-    appl = str(v(config, "compliance.rpo_applicability"))
-    load = float(kpis["annual_load_mwh"])
-    solar = float(kpis["annual_solar_mwh"])
-    wind = float(kpis["annual_wind_mwh"])
-    targets = {
-        "solar": float(v(config, "compliance.rpo_solar_target_pct")),
-        "wind": float(v(config, "compliance.rpo_wind_target_pct")),
-        "hydro": float(v(config, "compliance.rpo_hydro_target_pct")),
-        "other": float(v(config, "compliance.rpo_other_target_pct")),
-    }
-    required = {k: load * t / 100.0 for k, t in targets.items()}
-    actual = {"solar": solar, "wind": wind, "hydro": 0.0, "other": 0.0}
-    gaps = {k: max(0.0, required[k] - actual[k]) for k in targets}
-    total_gap = sum(gaps.values())
-    buyout = float(v(config, "compliance.rpo_buyout_inr_per_kwh"))
-    cost = total_gap * 1000.0 * buyout if appl == "Applicable" else 0.0
-    passed = total_gap <= 1e-6
-    return {
-        "metric": "RPO",
-        "applicability": appl,
-        "targets_pct": targets,
-        "required_mwh": required,
-        "actual_mwh": actual,
-        "gap_mwh": gaps,
-        "status": _status(appl, passed if appl == "Applicable" else None),
-        "compliance_cost_inr": cost,
-    }
+def _architecture_re_pct(config: dict, kpis: dict) -> float | None:
+    """Architecture mix RE % (Solar + Wind + BESS) — same basis as 24×7 CFE."""
+    for key in ("simulated_mix_re_pct",):
+        if kpis.get(key) is not None:
+            try:
+                return max(0.0, min(100.0, float(kpis[key])))
+            except Exception:
+                pass
+
+    def _num(kpi_key: str, config_path: str, flag_path: str, flag_default: bool) -> float:
+        try:
+            if not bool(v(config, flag_path)):
+                return 0.0
+        except Exception:
+            if not flag_default:
+                return 0.0
+        if kpi_key in kpis and kpis[kpi_key] is not None:
+            try:
+                return max(0.0, float(kpis[kpi_key]))
+            except Exception:
+                pass
+        try:
+            return max(0.0, float(v(config, config_path)))
+        except Exception:
+            return 0.0
+
+    solar = _num("target_mix_solar_pct", "commercial.mix_solar_pct", "commercial.include_solar", True)
+    wind = _num("target_mix_wind_pct", "commercial.mix_wind_pct", "commercial.include_wind", True)
+    bess = _num("target_mix_bess_pct", "commercial.mix_bess_pct", "commercial.include_bess", True)
+    total = solar + wind + bess
+    if total > 0 or any(k in kpis for k in ("target_mix_solar_pct", "target_mix_wind_pct", "target_mix_bess_pct")):
+        return min(100.0, max(0.0, total))
+
+    if kpis.get("annual_re_pct") is not None:
+        try:
+            return max(0.0, min(100.0, float(kpis["annual_re_pct"])))
+        except Exception:
+            pass
+    try:
+        from backend.compliance.cfe_analytics import architecture_cf_fraction
+
+        return architecture_cf_fraction(config) * 100.0
+    except Exception:
+        return 0.0
 
 
-def evaluate_rco(config: dict, kpis: dict) -> dict:
-    appl = str(v(config, "compliance.rco_applicability"))
-    target = float(v(config, "compliance.rco_target_pct"))
-    actual = float(kpis["annual_re_pct"])
+def _architecture_bess_pct(config: dict, kpis: dict) -> float:
+    """Contracted BESS share of load from Architecture mix."""
+    for key in ("simulated_mix_bess_pct", "target_mix_bess_pct"):
+        if kpis.get(key) is not None:
+            try:
+                return max(0.0, min(100.0, float(kpis[key])))
+            except Exception:
+                pass
+    try:
+        if not bool(v(config, "commercial.include_bess")):
+            return 0.0
+    except Exception:
+        pass
+    try:
+        return max(0.0, min(100.0, float(v(config, "commercial.mix_bess_pct"))))
+    except Exception:
+        return 0.0
+
+
+def _read_rpo_rco_param(config: dict, integrated: str, *legacy: str, default=None):
+    """Prefer integrated RPO/RCO key; fall back to first available legacy key."""
+    try:
+        return v(config, f"compliance.{integrated}")
+    except Exception:
+        pass
+    for key in legacy:
+        try:
+            return v(config, f"compliance.{key}")
+        except Exception:
+            continue
+    return default
+
+
+def evaluate_rpo_rco(config: dict, kpis: dict) -> dict:
+    """Single integrated RPO/RCO obligation (purchase + consumption)."""
+    appl = str(
+        _read_rpo_rco_param(
+            config,
+            "rpo_rco_applicability",
+            "rpo_applicability",
+            "rco_applicability",
+            default="Unknown / Legal Review Required",
+        )
+    )
     load = float(kpis["annual_load_mwh"])
-    gap_mwh = max(0.0, load * target / 100.0 - float(kpis["re_serving_load_mwh"]))
-    route = str(v(config, "compliance.rco_compliance_route"))
+    mix_re = _architecture_re_pct(config, kpis)
+    actual_pct = float(mix_re if mix_re is not None else 0.0)
+    re_mwh = load * actual_pct / 100.0
+    actual_basis = "architecture_mix"
+
+    try:
+        target = float(
+            _read_rpo_rco_param(config, "rpo_rco_target_pct", "rpo_target_pct", "rco_target_pct", default=0.0)
+        )
+    except Exception:
+        target = 0.0
+        for key in (
+            "rpo_solar_target_pct",
+            "rpo_wind_target_pct",
+            "rpo_hydro_target_pct",
+            "rpo_other_target_pct",
+        ):
+            try:
+                target += float(v(config, f"compliance.{key}"))
+            except Exception:
+                pass
+    target = max(0.0, min(100.0, float(target or 0.0)))
+
+    required_mwh = load * target / 100.0
+    gap_mwh = max(0.0, required_mwh - re_mwh)
+
+    route = str(
+        _read_rpo_rco_param(
+            config,
+            "rpo_rco_compliance_route",
+            "rco_compliance_route",
+            default="Buyout",
+        )
+        or "Buyout"
+    )
     if route == "REC":
-        rate = float(v(config, "compliance.rco_rec_inr_per_kwh"))
+        rate = float(
+            _read_rpo_rco_param(
+                config,
+                "rpo_rco_rec_inr_per_kwh",
+                "rco_rec_inr_per_kwh",
+                default=1.0,
+            )
+            or 1.0
+        )
     else:
-        rate = float(v(config, "compliance.rco_buyout_inr_per_kwh"))
+        rate = float(
+            _read_rpo_rco_param(
+                config,
+                "rpo_rco_buyout_inr_per_kwh",
+                "rpo_buyout_inr_per_kwh",
+                "rco_buyout_inr_per_kwh",
+                default=1.0,
+            )
+            or 1.0
+        )
+
     cost = gap_mwh * 1000.0 * rate if appl == "Applicable" else 0.0
-    passed = actual >= target - 1e-9
+    passed = gap_mwh <= 1e-6
     return {
-        "metric": "RCO",
+        "metric": "RPO/RCO",
         "applicability": appl,
         "target_pct": target,
-        "actual_pct": actual,
+        "actual_pct": actual_pct,
+        "actual_basis": actual_basis,
+        "required_mwh": required_mwh,
+        "actual_mwh": re_mwh,
         "gap_mwh": gap_mwh,
         "compliance_route": route,
         "status": _status(appl, passed if appl == "Applicable" else None),
         "compliance_cost_inr": cost,
-        "legal_note": "LEGAL REVIEW REQUIRED" if appl != "Applicable" else "",
+        "legal_note": "LEGAL REVIEW REQUIRED" if appl == "Unknown / Legal Review Required" else "",
     }
+
+
+# Back-compat aliases (same integrated result)
+def evaluate_rpo(config: dict, kpis: dict) -> dict:
+    out = evaluate_rpo_rco(config, kpis)
+    return {**out, "metric": "RPO/RCO"}
+
+
+def evaluate_rco(config: dict, kpis: dict) -> dict:
+    return evaluate_rpo(config, kpis)
 
 
 def evaluate_eso(config: dict, kpis: dict) -> dict:
     appl = str(v(config, "compliance.eso_applicability"))
-    year = str(v(config, "compliance.eso_active_year"))
-    mapping = {
-        "FY2026-27": float(v(config, "compliance.eso_fy2026_27_pct")),
-        "FY2027-28": float(v(config, "compliance.eso_fy2027_28_pct")),
-        "FY2028-29": float(v(config, "compliance.eso_fy2028_29_pct")),
-        "FY2029-30": float(v(config, "compliance.eso_fy2029_30_pct")),
-    }
-    target = mapping.get(year, mapping["FY2026-27"])
+    try:
+        target = float(v(config, "compliance.eso_target_pct"))
+    except Exception:
+        # Legacy: pick active-year value from multi-year trajectory
+        year = "FY2026-27"
+        try:
+            year = str(v(config, "compliance.eso_active_year"))
+        except Exception:
+            pass
+        mapping = {}
+        for ykey, ckey in (
+            ("FY2026-27", "eso_fy2026_27_pct"),
+            ("FY2027-28", "eso_fy2027_28_pct"),
+            ("FY2028-29", "eso_fy2028_29_pct"),
+            ("FY2029-30", "eso_fy2029_30_pct"),
+        ):
+            try:
+                mapping[ykey] = float(v(config, f"compliance.{ckey}"))
+            except Exception:
+                pass
+        target = mapping.get(year, mapping.get("FY2026-27", 0.0))
+    target = max(0.0, min(100.0, target))
     load = float(kpis["annual_load_mwh"])
     required_storage = load * target / 100.0
-    actual_storage = float(kpis["bess_charge_mwh"])
-    re_origin = float(kpis["re_origin_stored_share_pct"])
+    # Buyer path: contracted BESS mix % × load (no plant charge/discharge MW)
+    bess_pct = _architecture_bess_pct(config, kpis)
+    actual_storage = load * bess_pct / 100.0
+    # Contracted Storage tariff energy is treated as renewable-origin for ESO
+    re_origin = 100.0 if actual_storage > 1e-9 else 100.0
     origin_req = float(v(config, "compliance.eso_re_origin_min_pct"))
     storage_ok = actual_storage >= required_storage - 1e-6
     origin_ok = (actual_storage <= 1e-9) or (re_origin >= origin_req - 1e-9)
@@ -142,34 +276,33 @@ def evaluate_eso(config: dict, kpis: dict) -> dict:
     return {
         "metric": "ESO",
         "applicability": appl,
-        "active_year": year,
         "target_pct": target,
         "required_storage_mwh": required_storage,
         "actual_storage_energy_mwh": actual_storage,
         "re_origin_storage_pct": re_origin,
         "re_origin_requirement_pct": origin_req,
+        "actual_basis": "architecture_mix",
         "status": _status(appl, passed if appl == "Applicable" else None),
         "compliance_cost_inr": cost,
-        "trajectory": mapping,
+        "gap_storage_mwh": gap_energy,
+        "storage_ok": storage_ok,
+        "origin_ok": origin_ok,
     }
 
 
 def evaluate_compliance(config: dict, kpis: dict) -> dict:
     re = evaluate_re(config, kpis)
     cfe = evaluate_cfe(config, kpis)
-    rpo = evaluate_rpo(config, kpis)
-    rco = evaluate_rco(config, kpis)
+    rpo_rco = evaluate_rpo_rco(config, kpis)
     eso = evaluate_eso(config, kpis)
-    total_cost = (
-        float(rpo["compliance_cost_inr"])
-        + float(rco["compliance_cost_inr"])
-        + float(eso["compliance_cost_inr"])
-    )
+    total_cost = float(rpo_rco["compliance_cost_inr"]) + float(eso["compliance_cost_inr"])
     return {
         "annual_re": re,
         "hourly_cfe": cfe,
-        "rpo": rpo,
-        "rco": rco,
+        "rpo_rco": rpo_rco,
+        # Aliases so older UI / feasibility still resolve one integrated result
+        "rpo": rpo_rco,
+        "rco": rpo_rco,
         "eso": eso,
         "total_compliance_cost_inr": total_cost,
     }

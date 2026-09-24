@@ -12,6 +12,7 @@ from .config import (
     PRESET_RE_TARGETS,
     USER_INPUT,
     active_architecture_mix_keys,
+    apply_architecture_profile,
     ensure_architecture_mix_sums_to_100,
     flatten_assumptions,
     get_default_config,
@@ -22,7 +23,9 @@ from .config import (
     merge_missing_defaults,
     recompute_calculated,
     set_param,
+    strip_plant_leftovers,
     v,
+    v_opt,
 )
 
 __all__ = [
@@ -39,6 +42,7 @@ __all__ = [
     "PRESET_RE_TARGETS",
     "USER_INPUT",
     "active_architecture_mix_keys",
+    "apply_architecture_profile",
     "ensure_architecture_mix_sums_to_100",
     "flatten_assumptions",
     "get_default_config",
@@ -49,5 +53,7 @@ __all__ = [
     "merge_missing_defaults",
     "recompute_calculated",
     "set_param",
+    "strip_plant_leftovers",
     "v",
+    "v_opt",
 ]

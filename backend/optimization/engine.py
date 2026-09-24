@@ -21,7 +21,7 @@ import numpy as np
 from backend.compliance.engine import evaluate_compliance
 from backend.financial.engine import evaluate_financial, incremental_vs_discom
 from backend.simulation.engine import run_simulation
-from config.defaults import v
+from config.defaults import v, v_opt
 
 
 def _steps(vmin: float, vmax: float, step: float) -> list[float]:
@@ -92,11 +92,11 @@ def _candidate_set(config: dict, mode: str) -> list[dict]:
     # Always include current project capacities
     picked.append(
         {
-            "solar_mw": float(v(config, "solar.capacity_mw")),
-            "wind_mw": float(v(config, "wind.capacity_mw")),
-            "bess_mw": float(v(config, "bess.power_mw")),
-            "bess_mwh": float(v(config, "bess.energy_mwh")),
-            "grid_mw": float(v(config, "grid.max_import_mw")),
+            "solar_mw": float(v_opt(config, "solar.capacity_mw", 0.0) or 0.0),
+            "wind_mw": float(v_opt(config, "wind.capacity_mw", 0.0) or 0.0),
+            "bess_mw": float(v_opt(config, "bess.power_mw", 0.0) or 0.0),
+            "bess_mwh": float(v_opt(config, "bess.energy_mwh", 0.0) or 0.0),
+            "grid_mw": float(v_opt(config, "grid.max_import_mw", 0.0) or 0.0),
         }
     )
     # Deduplicate
@@ -110,18 +110,12 @@ def _candidate_set(config: dict, mode: str) -> list[dict]:
     return uniq
 
 
-def _cfe_pass(config: dict, compliance: dict) -> bool:
-    return compliance["hourly_cfe"]["status"] == "Pass"
-
-
 def _feasible(config: dict, kpis: dict, compliance: dict) -> tuple[bool, list[str]]:
     reasons = []
     if bool(v(config, "optimization.enforce_no_unserved")) and float(kpis["unserved_mwh"]) > 1e-3:
         reasons.append("Grid capacity / availability insufficient (unserved energy)")
     if bool(v(config, "optimization.enforce_re_target")) and compliance["annual_re"]["status"] != "Pass":
         reasons.append("RE target too high / renewable capacity insufficient")
-    if bool(v(config, "optimization.enforce_cfe_target")) and not _cfe_pass(config, compliance):
-        reasons.append("CFE target too high / BESS capacity insufficient")
     return (len(reasons) == 0), reasons
 
 

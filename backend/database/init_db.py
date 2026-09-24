@@ -47,14 +47,15 @@ def _upsert_section(session, model, project_id: int, payload: dict):
 
 def sync_project_sections(session, project_id: int, config: dict):
     mapping = [
-        (m.LoadConfig, config["load"]),
-        (m.SolarConfig, config["solar"]),
-        (m.WindConfig, config["wind"]),
-        (m.BessConfig, config["bess"]),
-        (m.GridConfig, config["grid"]),
-        (m.CommercialStructure, config["commercial"]),
-        (m.ComplianceConfig, config["compliance"]),
-        (m.FinancialConfig, config["financial"]),
+        (m.LoadConfig, config.get("load") or {}),
+        (m.SolarConfig, config.get("solar") or {}),
+        (m.WindConfig, config.get("wind") or {}),
+        # Buyer path: BESS plant section removed — store empty payload for schema compatibility
+        (m.BessConfig, config.get("bess") or {}),
+        (m.GridConfig, config.get("grid") or {}),
+        (m.CommercialStructure, config.get("commercial") or {}),
+        (m.ComplianceConfig, config.get("compliance") or {}),
+        (m.FinancialConfig, config.get("financial") or {}),
     ]
     for model, payload in mapping:
         _upsert_section(session, model, project_id, payload)

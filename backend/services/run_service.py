@@ -17,8 +17,13 @@ from backend.models import db_models as m
 from backend.optimization.engine import run_optimization
 from backend.paths import data_dir
 from backend.services.project_service import get_project
-from backend.simulation.engine import cfe_heatmap, run_simulation, series_window
-from config.defaults import MODEL_VERSION, has_default_assumptions, v
+from backend.simulation.engine import cfe_heatmap, cfe_heatmap_from_pct, run_simulation, series_window
+from backend.simulation.lf_scenarios import (
+    apply_scenario_load_factor as _apply_scenario_load_factor,
+    lf_scenario_summary as _lf_scenario_summary,
+    load_factor_scenario_values as _load_factor_scenario_values,
+)
+from config.defaults import MODEL_VERSION, apply_architecture_profile, has_default_assumptions, recompute_calculated, v
 
 _OPT_LOCK = threading.Lock()
 _OPT_STATE: dict[int, dict[str, Any]] = {}
@@ -63,13 +68,13 @@ def _save_hourly(run_id: int, bundle) -> str:
     return str(path)
 
 
-def run_project_simulation(project_id: int, structure: str | None = None, scenario_id: int | None = None) -> dict:
-    project = get_project(project_id)
-    config = deepcopy(project["config"])
-    if structure:
-        config["commercial"]["structure"]["value"] = structure
 
-    # DISCOM baseline for incremental metrics
+
+
+
+
+def _evaluate_structure_run(config: dict, structure: str | None, project_id: int) -> dict[str, Any]:
+    """One architecture evaluation (project + DISCOM baseline). Does not persist."""
     discom = run_simulation(config, structure="DISCOM", project_id=project_id)
     discom_comp = evaluate_compliance(discom.config, discom.kpis)
     discom_fin = evaluate_financial(discom.config, discom.kpis, discom_comp, discom.dispatch)
@@ -85,7 +90,7 @@ def run_project_simulation(project_id: int, structure: str | None = None, scenar
         "total_annual_cost_inr": discom_fin["total_annual_cost_inr"],
         "annual_re_pct": discom.kpis["annual_re_pct"],
         "hourly_cfe_min_pct": discom.kpis["hourly_cfe_min_pct"],
-        "reason": "Grid-only comparator — solar/wind/BESS forced to 0 MW.",
+        "reason": "Grid-only comparator — Architecture mix = 100% DISCOM.",
     }
     if bundle.commercial_structure != "DISCOM":
         financial["npv_inr"] = financial["incremental"]["npv_inr"]
@@ -104,7 +109,7 @@ def run_project_simulation(project_id: int, structure: str | None = None, scenar
         "load": bundle.profiles.get("load_source", "SYNTHETIC"),
         "solar": bundle.profiles.get("solar_source", "SYNTHETIC"),
         "wind": bundle.profiles.get("wind_source", "SYNTHETIC"),
-        "tariff": "USER_INPUT" if not has_default_assumptions(project["config"]) else "DEFAULT / MIXED",
+        "tariff": "USER_INPUT" if not has_default_assumptions(config) else "DEFAULT / MIXED",
         "overall": (
             "PROJECT DATA ANALYSIS"
             if all(
@@ -113,9 +118,44 @@ def run_project_simulation(project_id: int, structure: str | None = None, scenar
             )
             else "PRELIMINARY"
         ),
-        "default_assumptions_remaining": count_default_assumptions(project["config"]),
-        "critical_defaults": critical_default_assumptions(project["config"]),
+        "default_assumptions_remaining": count_default_assumptions(config),
+        "critical_defaults": critical_default_assumptions(config),
     }
+    return {
+        "bundle": bundle,
+        "compliance": compliance,
+        "financial": financial,
+        "feasibility": feasibility,
+        "data_quality": data_quality,
+    }
+
+
+def run_project_simulation(project_id: int, structure: str | None = None, scenario_id: int | None = None) -> dict:
+    project = get_project(project_id)
+    config = deepcopy(project["config"])
+    if structure:
+        # Use that architecture's saved mix/assets/commercial profile (from UI memory),
+        # not only a renamed structure on the currently selected architecture's inputs.
+        apply_architecture_profile(config, structure)
+
+    lf_list = _load_factor_scenario_values(config)
+    lf_scenarios: list[dict[str, Any]] = []
+    primary: dict[str, Any] | None = None
+
+    for idx, lf in lf_list:
+        cfg_i = _apply_scenario_load_factor(deepcopy(config), lf)
+        eval_out = _evaluate_structure_run(cfg_i, structure, project_id)
+        lf_scenarios.append(_lf_scenario_summary(idx, lf, eval_out))
+        if primary is None:
+            primary = eval_out
+
+    assert primary is not None
+    bundle = primary["bundle"]
+    compliance = primary["compliance"]
+    financial = primary["financial"]
+    feasibility = primary["feasibility"]
+    data_quality = primary["data_quality"]
+    financial["lf_scenarios"] = lf_scenarios
 
     session = SessionLocal()
     try:
@@ -151,22 +191,21 @@ def run_project_simulation(project_id: int, structure: str | None = None, scenar
     can_rec = bool(feasibility.get("can_recommend"))
     recommendation = {
         "architecture": bundle.commercial_structure,
-        "solar_mw": bundle.kpis["solar_mw"],
-        "wind_mw": bundle.kpis["wind_mw"],
-        "bess_mw": bundle.kpis["bess_mw"],
-        "bess_mwh": bundle.kpis["bess_mwh"],
-        "grid_mw": bundle.kpis["grid_mw"],
+        "mix_discom_pct": bundle.kpis.get("simulated_mix_grid_pct"),
+        "mix_solar_pct": bundle.kpis.get("simulated_mix_solar_pct"),
+        "mix_wind_pct": bundle.kpis.get("simulated_mix_wind_pct"),
+        "mix_bess_pct": bundle.kpis.get("simulated_mix_bess_pct"),
         "annual_re_pct": bundle.kpis["annual_re_pct"],
         "hourly_cfe_pct": bundle.kpis["hourly_cfe_min_pct"],
         "cost_per_kwh": financial["cost_per_kwh"],
         "label": "RECOMMENDED" if can_rec else feasibility.get("status", "NOT FEASIBLE"),
         "feasible": can_rec,
         "why": (
-            "Configuration passes enabled technical constraints."
+            "Configuration passes Architecture RE/CFE targets."
             if can_rec
             else (
                 feasibility.get("primary_issue")
-                or "Configuration does not meet RE/CFE/unserved targets — not labelled Recommended."
+                or "Configuration does not meet Architecture RE/CFE targets — not labelled Recommended."
             )
         ),
     }
@@ -192,6 +231,7 @@ def run_project_simulation(project_id: int, structure: str | None = None, scenar
         "input_version": project["input_version"],
         "profile_sources": bundle.profiles,
         "results_stale": False,
+        "lf_scenarios": lf_scenarios,
     }
 
 
@@ -238,21 +278,36 @@ def get_simulation(run_id: int) -> dict:
             can_rec = bool(feas.get("can_recommend"))
             out["recommendation"] = {
                 "architecture": run.structure,
-                "solar_mw": kpis.get("solar_mw"),
-                "wind_mw": kpis.get("wind_mw"),
-                "bess_mw": kpis.get("bess_mw"),
-                "bess_mwh": kpis.get("bess_mwh"),
-                "grid_mw": kpis.get("grid_mw"),
+                "mix_discom_pct": kpis.get("simulated_mix_grid_pct"),
+                "mix_solar_pct": kpis.get("simulated_mix_solar_pct"),
+                "mix_wind_pct": kpis.get("simulated_mix_wind_pct"),
+                "mix_bess_pct": kpis.get("simulated_mix_bess_pct"),
                 "annual_re_pct": kpis.get("annual_re_pct"),
                 "hourly_cfe_pct": kpis.get("hourly_cfe_min_pct"),
                 "cost_per_kwh": out["financial"].get("cost_per_kwh"),
                 "label": "RECOMMENDED" if can_rec else feas.get("status", "NOT FEASIBLE"),
                 "feasible": can_rec,
                 "why": feas.get("primary_issue")
-                or ("Passes enabled technical constraints." if can_rec else "Not labelled Recommended."),
+                or ("Passes Architecture RE/CFE targets." if can_rec else "Not labelled Recommended."),
             }
         except Exception:  # noqa: BLE001
             out["results_stale"] = False
+        # Hourly CFE heatmap for analysis UI (from memory cache or saved hourly file)
+        try:
+            if run_id in _LAST_DISPATCH:
+                out["heatmap_cfe"] = cfe_heatmap(_LAST_DISPATCH[run_id])
+            elif run.hourly_path:
+                from pathlib import Path
+
+                p = Path(run.hourly_path)
+                if p.exists():
+                    data = np.load(p)
+                    if "hourly_cfe_pct" in data:
+                        out["heatmap_cfe"] = cfe_heatmap_from_pct(data["hourly_cfe_pct"])
+        except Exception:  # noqa: BLE001
+            pass
+        if "lf_scenarios" not in out and isinstance(out.get("financial"), dict):
+            out["lf_scenarios"] = out["financial"].get("lf_scenarios") or []
         return out
     finally:
         session.close()
@@ -327,12 +382,14 @@ def run_marginal_analysis(project_id: int) -> dict:
     project = get_project(project_id)
     cfg = project["config"]
     structure = str(v(cfg, "commercial.structure"))
+    from config.defaults import v_opt
+
     base_cand = {
-        "solar_mw": float(v(cfg, "solar.capacity_mw")),
-        "wind_mw": float(v(cfg, "wind.capacity_mw")),
-        "bess_mw": float(v(cfg, "bess.power_mw")),
-        "bess_mwh": float(v(cfg, "bess.energy_mwh")),
-        "grid_mw": float(v(cfg, "grid.max_import_mw")),
+        "solar_mw": float(v_opt(cfg, "solar.capacity_mw", 0.0) or 0.0),
+        "wind_mw": float(v_opt(cfg, "wind.capacity_mw", 0.0) or 0.0),
+        "bess_mw": float(v_opt(cfg, "bess.power_mw", 0.0) or 0.0),
+        "bess_mwh": float(v_opt(cfg, "bess.energy_mwh", 0.0) or 0.0),
+        "grid_mw": float(v_opt(cfg, "grid.max_import_mw", 0.0) or 0.0),
     }
     discom = run_simulation(cfg, structure="DISCOM", project_id=project_id, skip_validation=True)
     discom_comp = evaluate_compliance(discom.config, discom.kpis)
@@ -557,30 +614,159 @@ def run_sensitivity(project_id: int, parameters: list[str] | None = None) -> dic
 
 
 def compare_architectures(project_id: int) -> dict:
+    """Run Captive / Hybrid (+ DISCOM baseline) using each architecture profile + shared Setup inputs."""
     rows = {}
-    for structure in ("DISCOM", "CAPTIVE", "HYBRID", "OPEN_ACCESS"):
+    for structure in ("DISCOM", "CAPTIVE", "HYBRID"):
         rows[structure] = run_project_simulation(project_id, structure=structure)
-    best = None
+
+    def _cost(structure: str) -> float:
+        return float(rows[structure]["financial"]["cost_per_kwh"])
+
+    def _bill_cr(structure: str) -> float:
+        fin = rows[structure]["financial"]
+        xt = fin.get("excel_tariff") or {}
+        if xt.get("annual_bill_cr") is not None:
+            return float(xt["annual_bill_cr"])
+        if xt.get("annual_energy_cr") is not None:
+            return float(xt["annual_energy_cr"])
+        return float(fin.get("total_annual_cost_inr") or 0.0) / 1e7
+
+    def _savings_cr(structure: str) -> float:
+        xt = (rows[structure]["financial"].get("excel_tariff") or {})
+        return float(xt.get("savings_vs_discom_cr") or 0.0)
+
+    def _npv_cr(structure: str) -> float:
+        return float(rows[structure]["financial"].get("npv_cr") or 0.0)
+
+    def _cfe_mix(structure: str) -> float:
+        fin = rows[structure]["financial"]
+        xt = fin.get("excel_tariff") or {}
+        if xt.get("cfe_pct") is not None:
+            return float(xt["cfe_pct"])
+        if xt.get("re_pct") is not None:
+            return float(xt["re_pct"])
+        return float(rows[structure]["kpis"].get("annual_re_pct") or 0.0)
+
+    def _hourly_min(structure: str) -> float:
+        k = rows[structure]["kpis"]
+        ca = rows[structure].get("cfe_analytics") or k.get("cfe_analytics") or {}
+        if ca.get("min_hourly_cfe_pct") is not None:
+            return float(ca["min_hourly_cfe_pct"])
+        return float(k.get("hourly_cfe_min_pct") or 0.0)
+
+    def _feas(structure: str) -> dict:
+        return rows[structure].get("feasibility") or {}
+
+    # Recommended = lowest cost among *feasible* Captive/Hybrid only (never DISCOM).
+    recommended = None
     best_cost = None
-    for structure, res in rows.items():
-        feas = res.get("feasibility") or {}
-        can = bool(feas.get("can_recommend"))
-        # DISCOM is a baseline comparator — never auto-recommended when RE/CFE targets exist
-        if structure == "DISCOM":
-            can = False
-        cost = float(res["financial"]["cost_per_kwh"])
-        if can and (best_cost is None or cost < best_cost):
+    for structure in ("CAPTIVE", "HYBRID"):
+        if not bool(_feas(structure).get("can_recommend")):
+            continue
+        cost = _cost(structure)
+        if best_cost is None or cost < best_cost:
             best_cost = cost
-            best = structure
-    recommended = best
-    if best is None:
-        # Lowest cost among technically feasible (or all) — labelled separately
-        best = min(rows.keys(), key=lambda k: float(rows[k]["financial"]["cost_per_kwh"]))
-    return {
-        "architectures": rows,
-        "best": best,
-        "recommended": recommended,
-        "recommended_label": (
+            recommended = structure
+
+    arch_keys = [k for k in ("CAPTIVE", "HYBRID") if k in rows]
+    lowest_cost = (
+        min(arch_keys, key=_cost) if arch_keys else None
+    )
+
+    other = None
+    if recommended == "CAPTIVE":
+        other = "HYBRID" if "HYBRID" in rows else None
+    elif recommended == "HYBRID":
+        other = "CAPTIVE" if "CAPTIVE" in rows else None
+
+    why_lines: list[str] = []
+    if recommended and other:
+        d_cost = _cost(other) - _cost(recommended)
+        d_sav = _savings_cr(recommended) - _savings_cr(other)
+        d_npv = _npv_cr(recommended) - _npv_cr(other)
+        why_lines.append(
+            f"{recommended} is feasible and has the lower power cost "
+            f"(₹{_cost(recommended):.4f}/kWh vs ₹{_cost(other):.4f}/kWh for {other}; "
+            f"Δ ₹{d_cost:.4f}/kWh)."
+        )
+        why_lines.append(
+            f"Year-1 savings vs DISCOM: ₹{_savings_cr(recommended):.2f} Cr "
+            f"(₹{d_sav:+.2f} Cr vs {other}). "
+            f"NPV of savings: ₹{_npv_cr(recommended):.2f} Cr "
+            f"(₹{d_npv:+.2f} Cr vs {other})."
+        )
+        why_lines.append(
+            f"CFE / RE mix {_cfe_mix(recommended):.1f}% · Hourly CFE min {_hourly_min(recommended):.1f}%."
+        )
+        oth_feas = _feas(other)
+        if not bool(oth_feas.get("can_recommend")):
+            issue = oth_feas.get("primary_issue") or oth_feas.get("status") or "not feasible"
+            why_lines.append(f"{other} is not recommended because: {issue}.")
+    elif recommended:
+        why_lines.append(
+            f"{recommended} is the only feasible architecture among Captive/Hybrid "
+            f"at ₹{_cost(recommended):.4f}/kWh."
+        )
+    else:
+        why_lines.append(
+            "No Captive/Hybrid run is FEASIBLE with the current inputs, "
+            "so there is no recommended architecture."
+        )
+        for structure in arch_keys:
+            feas = _feas(structure)
+            issue = feas.get("primary_issue") or feas.get("status") or "unknown"
+            why_lines.append(f"{structure}: {feas.get('status') or 'UNKNOWN'} — {issue}.")
+        if lowest_cost:
+            why_lines.append(
+                f"Lowest cost (but not feasible): {lowest_cost} at ₹{_cost(lowest_cost):.4f}/kWh. "
+                "Fix binding constraints before selecting it."
+            )
+
+    recommendation = {
+        "architecture": recommended,
+        "label": (
             f"RECOMMENDED: {recommended}" if recommended else "NO FEASIBLE RECOMMENDATION"
         ),
+        "rule": (
+            "Among Captive and Hybrid, pick the FEASIBLE architecture with the lowest "
+            "₹/kWh power cost. DISCOM is only the grid-only savings baseline."
+        ),
+        "why": why_lines,
+        "metrics": None
+        if not recommended
+        else {
+            "power_cost_inr_per_kwh": _cost(recommended),
+            "annual_bill_cr": _bill_cr(recommended),
+            "savings_vs_discom_cr": _savings_cr(recommended),
+            "npv_cr": _npv_cr(recommended),
+            "cfe_mix_pct": _cfe_mix(recommended),
+            "hourly_cfe_min_pct": _hourly_min(recommended),
+            "feasibility_status": _feas(recommended).get("status"),
+        },
+        "vs_other": None
+        if not (recommended and other)
+        else {
+            "architecture": other,
+            "power_cost_inr_per_kwh": _cost(other),
+            "annual_bill_cr": _bill_cr(other),
+            "savings_vs_discom_cr": _savings_cr(other),
+            "npv_cr": _npv_cr(other),
+            "cfe_mix_pct": _cfe_mix(other),
+            "hourly_cfe_min_pct": _hourly_min(other),
+            "feasibility_status": _feas(other).get("status"),
+            "feasible": bool(_feas(other).get("can_recommend")),
+        },
+        "lowest_cost_architecture": lowest_cost,
+        "lowest_cost_feasible": bool(
+            lowest_cost and _feas(lowest_cost).get("can_recommend")
+        ),
+    }
+
+    return {
+        "architectures": rows,
+        "best": recommended or lowest_cost,
+        "recommended": recommended,
+        "lowest_cost_architecture": lowest_cost,
+        "recommended_label": recommendation["label"],
+        "recommendation": recommendation,
     }

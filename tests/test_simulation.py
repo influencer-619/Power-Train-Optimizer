@@ -14,6 +14,59 @@ def test_load_generation_and_factor():
     assert abs(load["actual_load_factor_pct"] - cfg["load"]["load_factor_pct"]["value"]) < 5.0
 
 
+def test_seasonal_tod_load_shape():
+    """Season × day/night × weekday/weekend; mean tracks load factor."""
+    cfg = recompute_calculated(get_default_config())
+    cfg["load"]["load_model"]["value"] = "Seasonal TOD"
+    cfg["load"]["seasonal_tod_summer_day"]["value"] = 1.20
+    cfg["load"]["seasonal_tod_summer_night"]["value"] = 0.80
+    cfg["load"]["seasonal_tod_rainy_day"]["value"] = 1.0
+    cfg["load"]["seasonal_tod_rainy_night"]["value"] = 1.0
+    cfg["load"]["seasonal_tod_winter_day"]["value"] = 1.0
+    cfg["load"]["seasonal_tod_winter_night"]["value"] = 1.0
+    cfg["load"]["weekday_multiplier"]["value"] = 1.0
+    cfg["load"]["weekend_multiplier"]["value"] = 1.0
+    cfg = recompute_calculated(cfg)
+    load = generate_load(cfg)
+    peak = float(cfg["load"]["peak_load_mw"]["value"])
+    lf = float(cfg["load"]["load_factor_pct"]["value"]) / 100.0
+    assert abs(load["load_mw"].mean() - peak * lf) < 1e-6
+    from backend.simulation.calendar import get_calendar
+
+    cal = get_calendar(start_month=1, end_month=12, leap=False)
+    apr_day = [
+        t for t in range(cal.hours)
+        if int(cal.month[t]) + 1 == 4 and int(cal.hour_of_day[t]) == 12
+    ]
+    apr_night = [
+        t for t in range(cal.hours)
+        if int(cal.month[t]) + 1 == 4 and int(cal.hour_of_day[t]) == 0
+    ]
+    assert load["load_mw"][apr_day[0]] > load["load_mw"][apr_night[0]]
+
+
+def test_seasonal_tod_applies_weekend_multiplier():
+    cfg = recompute_calculated(get_default_config())
+    cfg["load"]["weekday_multiplier"]["value"] = 1.0
+    cfg["load"]["weekend_multiplier"]["value"] = 0.5
+    # Neutral season/TOD so weekday effect is clear
+    for k in (
+        "seasonal_tod_summer_day", "seasonal_tod_summer_night",
+        "seasonal_tod_rainy_day", "seasonal_tod_rainy_night",
+        "seasonal_tod_winter_day", "seasonal_tod_winter_night",
+    ):
+        cfg["load"][k]["value"] = 1.0
+    cfg = recompute_calculated(cfg)
+    load = generate_load(cfg)
+    from backend.simulation.calendar import get_calendar
+
+    cal = get_calendar(start_month=1, end_month=12, leap=False)
+    wd_idx = next(t for t in range(cal.hours) if int(cal.weekday[t]) < 5)
+    we_idx = next(t for t in range(cal.hours) if int(cal.weekday[t]) >= 5)
+    # After mean-scaling, weekend hours should sit below weekday when we=0.5
+    assert load["load_mw"][we_idx] < load["load_mw"][wd_idx]
+
+
 def test_solar_night_zero_and_cf():
     cfg = recompute_calculated(get_default_config())
     solar = generate_solar(cfg)

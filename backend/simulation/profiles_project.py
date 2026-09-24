@@ -14,7 +14,7 @@ from backend.paths import data_dir
 from config.defaults import DEFAULT_ASSUMPTION, USER_INPUT
 
 
-ALLOWED_HOURS = (8760, 8784)
+ALLOWED_HOURS = (8760, 8784)  # preferred full-year lengths; other positive lengths also allowed when matching model_hours
 
 
 def profile_store_dir(project_id: int) -> Path:
@@ -35,8 +35,8 @@ def validate_hourly_series(
     warnings: list[str] = []
     arr = np.asarray(values, dtype=float).reshape(-1)
 
-    if expected_hours not in ALLOWED_HOURS:
-        errors.append(f"{name}: expected_hours must be 8760 or 8784 (got {expected_hours}).")
+    if expected_hours < 24 or expected_hours > 8784:
+        errors.append(f"{name}: expected_hours must be between 24 and 8784 (got {expected_hours}).")
     if len(arr) != expected_hours:
         errors.append(f"{name}: expected exactly {expected_hours} hourly values, got {len(arr)}.")
     if np.any(~np.isfinite(arr)):
@@ -118,7 +118,7 @@ def save_project_profile(
     if kind not in ("load", "solar", "wind"):
         raise ValueError("kind must be load, solar, or wind")
     expected = len(values)
-    report = validate_hourly_series(values, name=kind, timestamps=timestamps, expected_hours=expected if expected in ALLOWED_HOURS else 8760)
+    report = validate_hourly_series(values, name=kind, timestamps=timestamps, expected_hours=expected)
     if not report["ok"]:
         return {"ok": False, "validation": report}
 

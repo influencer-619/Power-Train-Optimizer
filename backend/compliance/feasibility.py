@@ -44,11 +44,24 @@ def evaluate_feasibility(
     # Incomplete: critical defaults still present AND user hasn't confirmed
     incomplete = bool(has_default_assumptions(config))
 
-    enforce_re = bool(v(config, "optimization.enforce_re_target")) if enforce_re is None else enforce_re
-    enforce_cfe = bool(v(config, "optimization.enforce_cfe_target")) if enforce_cfe is None else enforce_cfe
-    enforce_unserved = (
-        bool(v(config, "optimization.enforce_no_unserved")) if enforce_unserved is None else enforce_unserved
+    from config.defaults import v_opt
+
+    enforce_re = (
+        bool(v_opt(config, "optimization.enforce_re_target", False))
+        if enforce_re is None
+        else enforce_re
     )
+    # CFE Pass/Fail is always reported from the formula; it is not a feasibility gate.
+    enforce_cfe = False if enforce_cfe is None else enforce_cfe
+    # Buyer path: plant-shaped 8760 unserved is diagnostic only (BESS plant = 0 by design).
+    # Never gate Captive/Hybrid/DISCOM feasibility on profile unserved unless explicitly forced.
+    try:
+        structure = str(v(config, "commercial.structure") or "")
+    except Exception:
+        structure = ""
+    buyer_path = structure in ("DISCOM", "CAPTIVE", "HYBRID", "OPEN_ACCESS")
+    if enforce_unserved is None:
+        enforce_unserved = False if buyer_path else bool(v_opt(config, "optimization.enforce_no_unserved", False))
 
     re = compliance.get("annual_re", {})
     cfe = compliance.get("hourly_cfe", {})
@@ -56,7 +69,9 @@ def evaluate_feasibility(
     cfe_t = float(cfe.get("target_pct") or v(config, "compliance.hourly_cfe_target_pct"))
     re_a = float(re.get("actual_pct") if re.get("actual_pct") is not None else kpis.get("annual_re_pct", 0))
     cfe_a = float(cfe.get("min_pct") if cfe.get("min_pct") is not None else kpis.get("hourly_cfe_min_pct", 0))
+    # Commercial KPI unserved is 0 on buyer path; fall back to dispatch diagnostic only if enforced
     unserved = float(kpis.get("unserved_mwh") or 0.0)
+    dispatch_unserved = float(kpis.get("dispatch_unserved_mwh") or unserved)
 
     checks = {
         "annual_re": {
@@ -80,12 +95,16 @@ def evaluate_feasibility(
         },
         "unserved": {
             "actual_mwh": unserved,
+            "dispatch_mwh": dispatch_unserved,
             "allowed_mwh": 0.0 if enforce_unserved else None,
             "enforced": enforce_unserved,
             "pass": (unserved <= 1e-3) if enforce_unserved else True,
+            "note": "Buyer path ignores plant-profile unserved" if buyer_path and not enforce_unserved else None,
         },
-        "rpo": {"status": compliance.get("rpo", {}).get("status"), "pass": _reg_ok(compliance.get("rpo", {}))},
-        "rco": {"status": compliance.get("rco", {}).get("status"), "pass": _reg_ok(compliance.get("rco", {}))},
+        "rpo_rco": {
+            "status": (compliance.get("rpo_rco") or compliance.get("rpo") or {}).get("status"),
+            "pass": _reg_ok(compliance.get("rpo_rco") or compliance.get("rpo") or {}),
+        },
         "eso": {"status": compliance.get("eso", {}).get("status"), "pass": _reg_ok(compliance.get("eso", {}))},
     }
 
@@ -97,7 +116,11 @@ def evaluate_feasibility(
                 "message": "Unserved energy above allowance",
                 "actual": unserved,
                 "target": 0.0,
-                "remedies": ["increase grid capacity", "increase BESS power/energy", "reduce peak load"],
+                "remedies": [
+                    "raise Architecture DISCOM mix % (grid backup)",
+                    "raise contracted Solar/Wind/BESS mix %",
+                    "reduce peak / study load",
+                ],
             }
         )
     if enforce_re and not checks["annual_re"]["pass"]:
@@ -107,7 +130,10 @@ def evaluate_feasibility(
                 "message": "Annual RE below target",
                 "actual": re_a,
                 "target": re_t,
-                "remedies": ["increase solar", "increase wind", "reduce curtailment via BESS", "relax RE target"],
+                "remedies": [
+                    "raise Architecture Solar% / Wind% / BESS%",
+                    "lower annual RE target",
+                ],
             }
         )
     if enforce_cfe and not checks["hourly_cfe"]["pass"]:
@@ -118,26 +144,34 @@ def evaluate_feasibility(
                 "actual": checks["hourly_cfe"]["actual_pct"],
                 "target": cfe_t,
                 "min_hourly": cfe_a,
-                "remedies": ["increase BESS energy", "increase wind (night)", "increase BESS power", "relax CFE target or pass mode"],
+                "remedies": [
+                    "raise Architecture Solar%+Wind%+BESS% (firm CFE)",
+                    "lower hourly CFE target",
+                ],
             }
         )
 
     # Soft compliance visibility (not always hard-fail for Applicable-only)
-    for key in ("rpo", "rco", "eso"):
+    for key in ("rpo_rco", "eso"):
         st = checks[key]["status"]
         if st == "Fail":
+            label = "RPO/RCO" if key == "rpo_rco" else "ESO"
             binding.append(
                 {
-                    "code": key.upper(),
-                    "message": f"{key.upper()} status Fail",
+                    "code": "RPO_RCO" if key == "rpo_rco" else "ESO",
+                    "message": f"{label} status Fail",
                     "actual": st,
                     "target": "Pass",
-                    "remedies": ["adjust RE/storage", "review applicability", "buyout/REC routes if modelled"],
+                    "remedies": [
+                        "raise Architecture RE / BESS mix %",
+                        "review applicability",
+                        "use buyout/REC route if modelled",
+                    ],
                 }
             )
 
     legal_pending = any(
-        compliance.get(k, {}).get("status") == LEGAL_REVIEW for k in ("rpo", "rco", "eso")
+        (compliance.get(k) or {}).get("status") == LEGAL_REVIEW for k in ("rpo_rco", "rpo", "rco", "eso")
     )
 
     hard_fail = (
@@ -145,7 +179,10 @@ def evaluate_feasibility(
         or (enforce_cfe and not checks["hourly_cfe"]["pass"])
         or (enforce_unserved and not checks["unserved"]["pass"])
     )
-    target_miss = re.get("status") == "Fail" or cfe.get("status") == "Fail" or unserved > 1e-3
+    # Buyer Architecture: feasibility = RE/CFE targets only (not plant-profile unserved)
+    target_miss = re.get("status") == "Fail" or cfe.get("status") == "Fail"
+    if enforce_unserved and unserved > 1e-3:
+        target_miss = True
 
     if target_miss or hard_fail:
         status = "NOT FEASIBLE"
@@ -156,7 +193,7 @@ def evaluate_feasibility(
                     "message": "Annual RE below target (target miss)",
                     "actual": re_a,
                     "target": re_t,
-                    "remedies": ["increase solar/wind/BESS", "relax target"],
+                    "remedies": ["raise Architecture Solar%/Wind%/BESS%", "lower annual RE target"],
                 }
             )
         if cfe.get("status") == "Fail" and not any(b["code"] == "HOURLY_CFE" for b in binding):
@@ -167,17 +204,17 @@ def evaluate_feasibility(
                     "actual": checks["hourly_cfe"]["actual_pct"],
                     "target": cfe_t,
                     "min_hourly": cfe_a,
-                    "remedies": ["increase BESS/wind", "relax CFE target or pass mode"],
+                    "remedies": ["raise Architecture Solar%+Wind%+BESS%", "lower hourly CFE target"],
                 }
             )
-        if unserved > 1e-3 and not any(b["code"] == "UNSERVED" for b in binding):
+        if enforce_unserved and unserved > 1e-3 and not any(b["code"] == "UNSERVED" for b in binding):
             binding.append(
                 {
                     "code": "UNSERVED",
                     "message": "Unserved energy > 0",
                     "actual": unserved,
                     "target": 0.0,
-                    "remedies": ["increase grid or BESS"],
+                    "remedies": ["raise Architecture DISCOM or RE mix %"],
                 }
             )
     elif incomplete:
@@ -188,19 +225,19 @@ def evaluate_feasibility(
         status = "FEASIBLE"
 
     primary = binding[0] if binding else None
-    approx_bess = None
-    if primary and primary.get("code") == "HOURLY_CFE":
-        # Heuristic: each extra MWh of BESS ≈ helps night CFE; rough gap scaling
-        gap = max(0.0, cfe_t - cfe_a)
-        current = float(kpis.get("bess_mwh") or 0.0)
-        approx_bess = round(current + gap / 100.0 * float(kpis.get("annual_load_mwh") or 0) * 0.02, 1)
+    # Architecture gap vs target (pp), not plant BESS MWh
+    approx_mix_pp = None
+    if primary and primary.get("code") in ("HOURLY_CFE", "ANNUAL_RE"):
+        gap = max(0.0, float(primary.get("target") or 0) - float(primary.get("actual") or primary.get("min_hourly") or 0))
+        approx_mix_pp = round(gap, 1)
 
     return {
         "status": status,
         "can_recommend": status == "FEASIBLE",
         "primary_issue": (primary or {}).get("message"),
         "primary_binding": primary,
-        "approximate_extra_bess_mwh": approx_bess,
+        "approximate_extra_architecture_re_pp": approx_mix_pp,
+        "approximate_extra_bess_mwh": None,  # plant sizing removed on buyer path
         "checks": checks,
         "binding_constraints": binding,
         "incomplete_inputs": incomplete,
@@ -257,21 +294,20 @@ def explain_no_feasible(
     code = "UNKNOWN"
     if primary_label and "CFE" in primary_label.upper():
         code = "HOURLY_CFE"
-        remedies = ["increase BESS energy", "increase wind", "increase BESS power", "relax CFE target"]
+        remedies = ["raise Architecture Solar%+Wind%+BESS%", "lower hourly CFE target"]
     elif primary_label and "RE" in primary_label.upper():
         code = "ANNUAL_RE"
-        remedies = ["increase solar", "increase wind", "relax RE target"]
+        remedies = ["raise Architecture Solar%/Wind%/BESS%", "lower annual RE target"]
     elif primary_label and "unserved" in primary_label.lower():
         code = "UNSERVED"
-        remedies = ["increase grid capacity", "increase BESS", "reduce load"]
+        remedies = ["raise Architecture DISCOM or RE mix %", "reduce load"]
     else:
-        remedies = ["widen capacity bounds", "relax targets", "switch search to Thorough"]
+        remedies = ["raise Architecture RE mix %", "relax compliance targets"]
 
     approx = None
-    if code == "HOURLY_CFE" and best_cfe is not None:
-        gap = max(0.0, cfe_t - best_cfe)
-        cur = float((best or {}).get("candidate", {}).get("bess_mwh") or 0)
-        approx = round(cur + gap * 8.0, 1)  # rough heuristic from model results scale
+    if code in ("HOURLY_CFE", "ANNUAL_RE") and best_cfe is not None:
+        gap = max(0.0, cfe_t - best_cfe) if code == "HOURLY_CFE" else max(0.0, re_t - (best_re or 0.0))
+        approx = round(gap, 1)
 
     return {
         "headline": "NO FEASIBLE SOLUTION",
@@ -282,7 +318,8 @@ def explain_no_feasible(
         "target_re_pct": re_t,
         "best_achieved_re_pct": best_re,
         "best_candidate": (best or {}).get("candidate"),
-        "additional_bess_mwh_approx": approx,
+        "additional_architecture_re_pp_approx": approx,
+        "additional_bess_mwh_approx": None,
         "other_potential_remedies": remedies,
         "binding_counts": dict(binding_counter),
         "message": (

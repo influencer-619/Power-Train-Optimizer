@@ -201,8 +201,19 @@ def build_energy_ledger(d: DispatchResult) -> dict[str, Any]:
     annual_rec = _reconcile(annual)
     months = []
     n = len(d.load_mw)
-    for i, (a, b) in enumerate(month_slices(n)):
-        flows = _flows_from_dispatch(d, a, b)
+    sm = int(d.meta.get("study_start_month") or 1)
+    em = int(d.meta.get("study_end_month") or 12)
+    try:
+        from backend.simulation.calendar import get_calendar
+
+        cal = get_calendar(start_month=sm, end_month=em)
+        if cal.hours != n:
+            cal = get_calendar(n)
+        slices = month_slices(cal=cal)
+    except Exception:
+        slices = month_slices(n)
+    for i, (a, b) in enumerate(slices):
+        flows = _flows_from_dispatch(d, a, b) if b > a else _flows_from_dispatch(d, 0, 0)
         rec = _reconcile(flows)
         months.append(
             {

@@ -72,7 +72,7 @@ class ReportBody(BaseModel):
 def create_app(init_db: bool = True) -> FastAPI:
     if init_db:
         initialize_database()
-    app = FastAPI(title="PowerTrain Optimizer", version=MODEL_VERSION)
+    app = FastAPI(title="Data Center PowerTrain", version=MODEL_VERSION)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

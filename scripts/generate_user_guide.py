@@ -128,10 +128,11 @@ def build():
     meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = meta.add_run(
         f"Model Version {MODEL_VERSION}\n"
-        "Techno-Economic 8,760-Hour Power Architecture Tool\n"
-        "for Data Centre · Solar · Wind · BESS · Grid\n"
-        "Includes: portable EXE · LAN sharing · Save Project (.pto.zip) · architecture asset selection · "
-        "asset usage % must sum to 100 · simplified BESS · discount-rate NPV · compact k/Lakh/Cr charts · "
+        "Commercial Data-Centre Power Buyer Tool\n"
+        "Captive vs Hybrid · DISCOM savings baseline · 8,760-hour dispatch\n"
+        "Includes: portable EXE · LAN sharing · Create/Open/Save .pto.zip · "
+        "Architecture % × tariff/PPA stacks (no generation-plant CAPEX) · "
+        "four load-factor scenarios (headline KPIs = S1) · compact k/Lakh/Cr charts · "
         "on-screen parameter help · Data Quality (SYNTHETIC / Defaults left)"
     )
     set_run_font(r, size=11)
@@ -159,18 +160,16 @@ def build():
             "Project Setup wizard (asset-aware steps)",
             "Parameter reference & on-screen help text",
             "Understanding source tags & data quality",
-            "Commercial architectures, selectable assets, usage % mix & recommendation rules",
-            "Compliance (RPO / RCO / ESO / RE / CFE) — edited in Project Setup",
-            "Profiles — optional PROJECT DATA CSV import",
-            "Running the 8,760-hour simulation, charts & Energy Ledger",
+            "Captive vs Hybrid — equal analysis, DISCOM baseline, mix % & storage tariff",
+            "Compliance (RPO/RCO single target, ESO single target, hourly CFE) — Project Setup",
+            "Optional PROJECT DATA CSV import (Project Setup load/solar/wind steps)",
+            "Running analysis, Dashboard comparison, Hourly CFE & load-factor scenarios",
             "How numbers are displayed (k / Lakh / Cr on charts & KPIs)",
-            "Feasibility status & binding constraints",
-            "Optimization, explainability & marginal analysis",
-            "Scenarios & sensitivity",
-            "Economics (incremental vs DISCOM) & reports",
-            "Assumptions, methodology & Settings (Share & access)",
-            "Detailed calculations & formulas (profiles, dispatch, RE/CFE, costs, NPV/IRR, ledger)",
-            "Recommended end-to-end workflow",
+            "Feasibility status & binding constraints (no architecture recommendation tags)",
+            "Economics, NPV of savings vs DISCOM & reports",
+            "Assumptions register (buyer-facing params only), methodology & Settings",
+            "Detailed calculations & formulas (bill blend, TOD/availability CFE, carbon, savings NPV)",
+            "End-to-end workflow",
             "Interpreting results correctly",
             "Data storage, backup & persistence",
             "Troubleshooting",
@@ -184,23 +183,24 @@ def build():
     add_heading(doc, "2. What PowerTrain Optimizer Is", 1)
     add_para(
         doc,
-        "PowerTrain Optimizer is a local Windows desktop application with a browser-based interface. "
-        "It performs genuine 8,760-hour techno-economic simulation and capacity optimization for a "
-        "Data Centre power architecture supplied by Solar, Wind, BESS and Grid.",
+        "PowerTrain Optimizer is a local Windows desktop application with a browser-based interface for "
+        "commercial data-centre power buyers. It models the facility power bill from Architecture mix % "
+        "× DISCOM / PPA / OA tariff stacks — not from solar/wind/BESS generation-plant CAPEX or OPEX.",
     )
-    add_para(doc, "It evaluates:")
+    add_para(doc, "On each Run 8760 Simulation (Run Analysis) it evaluates Captive and Hybrid equally using "
+             "the same Project Setup contracts, then shows DISCOM as a savings baseline only:")
     add_bullets(
         doc,
         [
-            "Annual Renewable Energy percentage (Annual RE %)",
-            "Hourly Carbon-Free Energy percentage (Hourly CFE %) with configurable pass modes and CFE analytics",
-            "Four commercial structures: DISCOM (GRID-ONLY BASELINE), Captive / Group Captive, Hybrid, Open Access",
-            "RPO, RCO and ESO compliance indicators (with legal-applicability gates)",
-            "Feasibility status and binding-constraint diagnosis (RECOMMENDED only when FEASIBLE)",
-            "Energy Ledger reconciliation and config fingerprint",
-            "TOTAL COST OF DELIVERED ENERGY (₹/kWh), incremental NPV/IRR/payback vs DISCOM",
-            "Architecture comparison, scenario management, sensitivity and optimization explainability",
-            "Optional PROJECT DATA 8,760-hour profile import (Load / Solar / Wind)",
+            "Side-by-side Captive vs Hybrid comparison on the Dashboard (+ DISCOM baseline column); "
+            "CAPTIVE and HYBRID detail tabs — no RECOMMENDED label or Status recommendation row",
+            "Annual RE % and Hourly CFE % (pass modes, CFE analytics, Hourly CFE page heatmaps/charts)",
+            "Four load-factor scenarios (S1–S4); headline KPIs and primary economics use S1",
+            "TOTAL COST OF DELIVERED ENERGY (₹/kWh) from tariff stacks; NPV of bill savings vs DISCOM",
+            "RPO/RCO single target, ESO single target, and hourly CFE compliance (Project Setup → Compliance)",
+            "Feasibility and binding-constraint diagnosis when targets are not met (informational — not a pick-one recommendation)",
+            "Optional PROJECT DATA CSV on Load / Solar / Wind (shapes). Mix % sets annual energy; bill uses Architecture %",
+            "Create / Open / Save portable .pto.zip; single EXE with optional LAN sharing",
         ],
     )
     add_heading(doc, "2.1 What it is not", 2)
@@ -212,23 +212,27 @@ def build():
             "Not dependent on Excel/CSV uploads to run — synthetic profiles are always available; PROJECT DATA import is optional.",
             "Not a cloud SaaS product — it is a portable Windows EXE / local server. You may also share it on the "
             "same office Wi‑Fi / LAN so colleagues open it by IP in their browser (see Section 3).",
-            "Not an investment recommendation engine that can label infeasible architectures as RECOMMENDED.",
+            "Not a generation-plant investment model — no solar/wind/BESS plant CAPEX, plant financing, or capacity optimization UI.",
+            "Not an architecture recommendation engine — the Dashboard does not assign RECOMMENDED or pick a winning structure.",
         ],
     )
     add_heading(doc, "2.2 Critical design rules", 2)
     add_bullets(
         doc,
         [
-            "Synthetic profiles remain the default — no mandatory file uploads for load, solar or wind.",
-            "Optional PROJECT DATA CSV import (exactly 8,760 or 8,784 hours) is available under Profiles; invalid files are rejected with no silent substitution.",
+            "Buyer economics only: power cost = Architecture % × stacked ₹/kWh tariffs (plus demand/fixed/compliance/additional costs).",
+            "Captive and Hybrid are both configured under Project Setup and analysed on every Run Analysis; "
+            "DISCOM is computed as GRID-ONLY BASELINE for savings — it is not a selectable architecture.",
+            "Hourly CFE uses TOD/availability (solar ~0 at night; wind/BESS can serve). Bill uses Architecture mix %.",
+            "BESS on Captive/Hybrid uses a single Storage tariff ₹/kWh (excel_bess_ppa_inr_per_kwh) — not battery plant CAPEX/MW.",
+            "DC load shape (Seasonal TOD / LF S1–S4) shapes demand only; optional PROJECT DATA CSV is for load, not plant invent.",
             "No external database server — embedded SQLite only.",
             "End users do not need Python, Node.js, Docker or admin rights.",
             "Every default number is labelled DEFAULT ASSUMPTION unless it comes from the concept note.",
             "All KPIs are calculated by the model — never hard-coded.",
-            "Architectures are never labelled RECOMMENDED if feasibility fails (RE/CFE/unserved/legal gates as configured).",
-            "DISCOM is a GRID-ONLY BASELINE comparator (solar/wind/BESS forced to 0).",
-            "After you change inputs, prior results are marked STALE until you re-run the 8,760 simulation.",
-            "Energy Ledger must reconcile annually and monthly; MODEL ERROR is raised on hard balance failures.",
+            "After you change inputs, prior results are marked STALE until you re-run analysis.",
+            "Hourly dispatch must balance; MODEL ERROR is raised on hard validation failures.",
+            "Assumptions register hides generation-plant leftovers (CAPEX/OPEX/plant MW/financing/optimization paths).",
         ],
     )
 
@@ -243,13 +247,18 @@ def build():
         ["Area", "What you see / get"],
         [
             [
-                "Energy Ledger",
-                "Annual + monthly flow table (solar/wind → load/BESS/curtail; BESS origin splits; grid; unserved) "
-                "with reconciliation status. Page: Energy Ledger. Excel sheet: Energy Ledger / Ledger Monthly.",
+                "Commercial buyer bill",
+                "Year-1 power bill from Architecture mix % × DISCOM / Solar / Wind / Storage tariff stacks. "
+                "No generation-plant CAPEX/OPEX in ₹/kWh or NPV.",
+            ],
+            [
+                "Captive vs Hybrid comparison",
+                "Each Run Analysis evaluates both Captive and Hybrid profiles plus a DISCOM baseline column on the Dashboard. "
+                "CAPTIVE / HYBRID tabs show detail. No RECOMMENDED tag or recommendation Status row.",
             ],
             [
                 "Config fingerprint",
-                "SHA-256 config hash stored with each run. Shown on Energy Ledger. Used for audit trail.",
+                "SHA-256 config hash stored with each run (Reports / audit). Changing inputs marks results STALE until re-run.",
             ],
             [
                 "Stale results",
@@ -263,30 +272,30 @@ def build():
             [
                 "Feasibility engine",
                 "Statuses: FEASIBLE | NOT FEASIBLE | INCOMPLETE INPUTS | LEGAL REVIEW REQUIRED | MODEL ERROR. "
-                "can_recommend is true only when status = FEASIBLE. Binding constraints list code, message, remedies.",
+                "Binding constraints list code, message, remedies. Used for Pass/Fail context — not to auto-pick Captive vs Hybrid.",
             ],
             [
-                "Recommendation rules",
-                "Dashboard architecture card shows RECOMMENDED only if feasible. Otherwise shows status "
-                "(e.g. NOT FEASIBLE) and “Why not recommended.” DISCOM is labelled GRID-ONLY BASELINE.",
+                "Economics vs DISCOM",
+                "Economics and Dashboard show GRID-ONLY BASELINE (DISCOM) bill and Captive/Hybrid savings. "
+                "NPV is the present value of annual bill savings vs DISCOM (no Δ plant CAPEX).",
             ],
             [
-                "Optimization explainability",
-                "Why-this-configuration bullets, nearby alternatives with why-not text, no-feasible detail with "
-                "primary binding constraint. Optional Marginal Capacity Steps (±solar/wind/BESS).",
+                "Load-factor scenarios",
+                "Four LF scenarios (S1–S4) from Project Setup load factors; each Run Analysis evaluates all four. "
+                "Headline KPIs and primary ₹/kWh use S1.",
             ],
             [
-                "Incremental economics",
-                "Economics page shows GRID-ONLY BASELINE (DISCOM) and Incremental vs DISCOM (Δ CAPEX, Δ OPEX, "
-                "NPV/IRR/payback). Non-DISCOM project NPV/IRR/payback use incremental cashflows.",
+                "Navigation (commercial UI)",
+                "Dashboard · Project Setup · Economics · Hourly CFE · Reports · Assumptions · Methodology · Settings. "
+                "No Optimization, Sensitivity, Energy Ledger, Profiles, or plant-capacity editor tabs.",
             ],
             [
                 "Cost label",
                 "₹/kWh is TOTAL COST OF DELIVERED ENERGY (annualised cost / load energy) — not a formal LCOE certificate.",
             ],
             [
-                "Project data profiles",
-                "Profiles menu: upload/clear Load, Solar, Wind CSVs. profile_source = SYNTHETIC | PROJECT DATA. "
+                "PROJECT DATA profiles",
+                "Optional CSV import on Project Setup Load / Solar / Wind steps (profile_source = SYNTHETIC | PROJECT DATA). "
                 "Missing/invalid PROJECT DATA raises MODEL ERROR (no silent fallback).",
             ],
             [
@@ -295,8 +304,8 @@ def build():
             ],
             [
                 "Reports",
-                "Excel adds Data Quality, Feasibility, Energy Ledger, CFE Analytics, incremental economics. "
-                "PDF includes feasibility, CFE pass mode, DISCOM baseline, binding constraints, stale warning.",
+                "Excel/PDF exports include Data Quality, Feasibility, CFE Analytics, Captive/Hybrid comparison, "
+                "DISCOM baseline, LF scenarios, and tariff-stack economics.",
             ],
             [
                 "Portable EXE + LAN share",
@@ -321,19 +330,16 @@ def build():
                 "Top bar Save Project writes inputs and a portable .pto.zip to a folder you choose.",
             ],
             [
-                "Architecture asset selection",
-                "DISCOM: DISCOM/grid only. CAPTIVE: Solar / Wind / BESS. HYBRID & OPEN_ACCESS: DISCOM + Solar + "
-                "Wind + BESS. Unselected assets are zeroed in simulation; Project Setup tabs follow the selection.",
+                "Architecture mix % (buyer contracts)",
+                "Captive and Hybrid each store Percentage of power (mix_*_pct) for selected assets (sum = 100%). "
+                "Mix % = annual contract energy (Σ Solar = Load×Solar%, shapes preserved — solar ~0 at night). "
+                "Bill: TARGET_POWER_PCT and SIMULATED_ENERGY_SHARE both use Architecture mix %. "
+                "Hourly CFE = Min(Load, Solar+Wind+RE-BESS)/Load.",
             ],
             [
-                "Architecture asset usage %",
-                "CAPTIVE: Solar %, Wind %, BESS %. HYBRID & OPEN_ACCESS: DISCOM %, Solar %, Wind %, BESS %. "
-                "Selected assets’ usage % must sum to exactly 100% (UI live total; save blocked if not). "
-                "Each % scales that asset’s configured Setup capacity. "
-                "Example: Solar 450 MW × 50% → effective 225 MW. DISCOM % scales grid max import; "
-                "BESS % scales both power (MW) and energy (MWh). Changing structure or asset chips "
-                "redistributes % evenly across the newly selected assets. Older projects with independent "
-                "100% values are auto-equalized on load.",
+                "BESS storage tariff",
+                "Captive/Hybrid: one Storage ₹/kWh field (excel_bess_ppa_inr_per_kwh). Charge/discharge stack lines "
+                "for OA-style BESS are not used on the buyer path.",
             ],
             [
                 "Network charges per asset",
@@ -350,15 +356,18 @@ def build():
                 "Analysis nav item). Dashboard links back to that setup step.",
             ],
             [
-                "Simplified BESS inputs",
-                "Charge efficiency, Discharge efficiency, Max charge power and Max discharge power are removed. "
-                "BESS power (MW) is both the charge and discharge limit; conversion efficiency is ideal (100%). "
-                "BESS losses MWh = 0. SOC_t = SOC_(t−1) + Charge_t − Discharge_t within min/max SOC.",
+                "Bill: Target = Simulated (Architecture mix)",
+                "Economics Grid%|RE% = Architecture DISCOM% | Solar%+Wind%+BESS%. "
+                "Hourly CFE / Annual RE use TOD availability (not flat firm mix).",
             ],
             [
-                "Incremental NPV discount rate",
-                "Incremental vs DISCOM NPV uses financial.discount_rate_pct from Project Setup → Financial "
-                "(same rate as standalone cash-flows). Simulation and optimization share this behaviour.",
+                "Savings NPV discount rate",
+                "NPV of savings vs DISCOM uses financial.discount_rate_pct from Project Setup → Financial.",
+            ],
+            [
+                "Assumptions register filter",
+                "Hides plant-leftover parameters (solar/wind/BESS plant CAPEX/OPEX/MW, financing, optimization) "
+                "so the register lists buyer-facing tariff and compliance inputs only.",
             ],
             [
                 "On-screen parameter help",
@@ -495,7 +504,7 @@ def build():
             "The UI then shows that the server stopped — close the Chrome tab yourself.",
             "Closing the browser tab / window also stops the background EXE (within a few seconds). "
             "Refresh within that window cancels the stop so you do not lose the session by accident.",
-            "If no UI heartbeats arrive for ~45 seconds, the process exits as a safety net.",
+            "If no UI heartbeats arrive for ~5 minutes, the process exits as a safety net.",
             "Quit App also terminates other orphaned PowerTrainOptimizer.exe copies from earlier runs.",
             "There is no separate CMD window to close for the packaged EXE (windowed build).",
             "Developer mode (run_dev.bat): the console window closes automatically when the server exits.",
@@ -512,17 +521,13 @@ def build():
             "Click Create New Project (loads full default parameters for the demo 250 MW case).",
             "Confirm the project opens and note the yellow DEFAULT ASSUMPTIONS banner.",
             "Optional: click Save Project in the top bar and choose a local folder for the .pto.zip backup.",
-            "Click Run 8760 Simulation in the top bar.",
-            "On the Dashboard, first read Feasibility, Data Quality and CFE Pass Mode cards — then the KPI row.",
-            "Check whether the architecture card says RECOMMENDED or NOT FEASIBLE / other status (demo often fails strict 90% CFE).",
-            "Open Energy Ledger and confirm reconciliation status is OK.",
-            "Open Project Setup: pick Architecture assets and Asset usage % (selected % must sum to 100), "
-            "edit Load/Solar/Wind/BESS/Grid, "
-            "Compliance and Financial (including Additional costs). Setup tabs follow selected assets.",
-            "After any input change, click Save Project again if you want the .pto.zip updated, then re-run "
-            "simulation if you see a STALE RESULTS banner.",
-            "Optionally run Optimization, Architecture Comparison, Sensitivity, then export Excel/PDF from Reports "
-            "(or Backup Project .pto.zip).",
+            "Click Run 8760 Simulation in the top bar (Run Analysis — evaluates Captive and Hybrid together).",
+            "On the Dashboard, read Feasibility, Data Quality and CFE Pass Mode, then the Captive vs Hybrid comparison "
+            "table (+ DISCOM baseline column). Open CAPTIVE / HYBRID tabs for detail.",
+            "Open Project Setup: configure Captive and Hybrid mix % (each selected set must sum to 100), "
+            "tariff/PPA stacks, Storage ₹/kWh, Load/Solar/Wind/Grid contracts, Compliance and Financial.",
+            "After any input change, Save Project if you want an updated .pto.zip, then re-run if STALE RESULTS appears.",
+            "Open Economics for Target = Simulated (bill); Hourly CFE for TOD availability charts; export Excel/PDF from Reports.",
             "When finished: Quit App (or close the Chrome tab) so the background EXE exits.",
         ],
     )
@@ -548,13 +553,13 @@ def build():
         ["Item", "Default"],
         [
             ["Typical seeded name / facility", "Default Data Centre - 250 MW (editable in Setup)"],
-            ["IT / peak load", "250 MW"],
+            ["IT load × PUE", "200 MW × 1.25 → 250 MW facility peak"],
             ["Load factor", "80% (base ≈ 200 MW)"],
             ["Solar", "450 MW @ 22% CF"],
             ["Wind", "300 MW @ 32% CF"],
             ["BESS", "150 MW / 600 MWh"],
             ["Grid max import", "250 MW @ 220 kV"],
-            ["Commercial structure", "HYBRID"],
+            ["Architectures analysed", "Captive + Hybrid (DISCOM baseline only)"],
             ["Annual RE target", "90%"],
             ["Hourly CFE target", "90%"],
         ],
@@ -586,7 +591,7 @@ def build():
         [
             "Project name and current page title",
             f"Model version chip (Model {MODEL_VERSION})",
-            "Commercial structure pill (e.g. HYBRID Architecture)",
+            "Active detail tab indicator when viewing CAPTIVE or HYBRID drill-down on Dashboard",
             "Study year selector (01 Jan – 31 Dec of the chosen calendar year)",
             "Run 8760 Simulation button — always available once a project is open",
             "Save Project — saves inputs and lets you store a .pto.zip on your local drive",
@@ -616,117 +621,49 @@ def build():
     menus = [
         (
             "Dashboard",
-            "Executive results home after a simulation (Model 2.0 layout). Top row: Feasibility card "
-            "(status + primary issue + binding constraints), Data Quality card (Load/Solar/Wind source, "
-            "defaults remaining, critical defaults), and CFE Pass Mode card (mode, target, min hour, "
-            "% hours ≥ target, longest deficit streak). Then enlarged KPI cards; monthly energy stacked chart; "
-            "hourly CFE heatmap (0–100% coral→amber→teal with target tick); cost and energy donuts; "
-            "architecture status card (RECOMMENDED only if feasible — otherwise NOT FEASIBLE / other status; "
-            "DISCOM shown as GRID-ONLY BASELINE); scenario comparison with feasibility-aware RECOMMENDED "
-            "label; compliance Pass/Fail with Why Fail? and a link Open Project Setup → Compliance; recent runs. "
-            "STALE RESULTS banner when inputs changed. "
-            "If no simulation has been run yet, prompts you to click Run 8760 Simulation.",
+            "Results home after Run Analysis. Feasibility, Data Quality and CFE Pass Mode cards; headline KPIs use "
+            "load-factor scenario S1. Side-by-side Captive vs Hybrid comparison table with a DISCOM (GRID-ONLY BASELINE) "
+            "column for savings context — no RECOMMENDED tag or recommendation Status row. CAPTIVE and HYBRID tabs open "
+            "detail for each architecture. Monthly energy chart, cost mix, compliance Pass/Fail with link to "
+            "Project Setup → Compliance, LF scenario summary, STALE RESULTS banner when inputs changed.",
         ),
         (
             "Project Setup",
-            "Guided wizard covering General, Data Centre, Load, selected asset steps (Solar/Wind/BESS/Grid per "
-            "Architecture checkboxes), Commercial, Compliance, Financial (incl. Additional costs), and Optimization. "
-            "Progress bar and step chips follow the selected assets. Buttons: Back, Save Section, Next / Finish. "
-            "Load/Solar/Wind steps include profile_source (SYNTHETIC | PROJECT DATA).",
-        ),
-        (
-            "Load",
-            "Direct editor for the data-centre load model (peak, load factor, shape multipliers, profile_source).",
-        ),
-        (
-            "Profiles",
-            "Optional PROJECT DATA import for Load, Solar and Wind. Upload a CSV with exactly 8,760 (or 8,784 leap) "
-            "hourly MW values. Validation rejects wrong length, NaN/Inf, negatives, and duplicate timestamps. "
-            "On success, profile_source is set to PROJECT DATA. Clear returns to SYNTHETIC. Invalid files are "
-            "never silently replaced by synthetic data — simulation raises MODEL ERROR if PROJECT DATA is selected "
-            "but the file is missing/invalid.",
-        ),
-        (
-            "Solar",
-            "Direct editor for solar capacity, CF, diurnal/seasonal factors, CAPEX/OPEX, energy cost and profile_source.",
-        ),
-        (
-            "Wind",
-            "Direct editor for wind capacity, CF, monthly factors, CAPEX/OPEX, energy cost and profile_source.",
-        ),
-        (
-            "BESS",
-            "Direct editor for battery power (MW) and energy (MWh), SOC window (initial/min/max), degradation, "
-            "CAPEX/OPEX, replacement and allow-grid-charge. Power rating is both max charge and max discharge; "
-            "charge/discharge efficiencies are not user inputs (modelled as 100%).",
-        ),
-        (
-            "Grid",
-            "Direct editor for interconnection voltage, import limit, tariffs (incl. TOD), demand/fixed charges "
-            "and DISCOM/grid network charges (when the DISCOM asset and network flag are enabled).",
-        ),
-        (
-            "Architecture",
-            "Select commercial structure (DISCOM / CAPTIVE / HYBRID / OPEN_ACCESS), tick which assets are in scope "
-            "(DISCOM-only for DISCOM; Solar/Wind/BESS for Captive; DISCOM+Solar+Wind+BESS for Hybrid/OA), "
-            "set Asset usage % for each selected asset (scales configured capacity), edit commercial/network "
-            "parameters filtered by structure/assets, and run Architecture Comparison. "
-            "Comparison highlights RECOMMENDED only among feasible architectures; DISCOM remains GRID-ONLY BASELINE.",
-        ),
-        (
-            "8760 Simulation",
-            "Hourly chart workspace. Choose a clear Time window (Full year overview / One month / One week / "
-            "One day), pick Month and Day of month when needed, then Show charts for Load/Solar/Wind, "
-            "BESS charge/discharge/SOC, grid/curtailment and hourly CFE, plus a monthly energy-balance table. "
-            "A live hint explains what each window displays.",
-        ),
-        (
-            "Energy Ledger",
-            "Audit view of annual and monthly energy flows after a simulation: solar/wind generation split to "
-            "load / BESS / curtailment; BESS charge by origin; BESS discharge by solar/wind/grid origin; "
-            "grid→load/BESS; unserved; reconciliation gaps (solar identity, wind identity, load identity, AC balance). "
-            "Shows config hash. Use this to prove the dispatch balances before presenting economics.",
-        ),
-        (
-            "Optimization",
-            "Set objective, search mode, capacity bounds and constraint flags, then run staged capacity optimization "
-            "(each candidate is a full 8,760 evaluation). Shows live progress, top feasible solutions, "
-            "WHY THIS CONFIGURATION? bullets, nearby alternatives, and optional Marginal Capacity Steps.",
-        ),
-        (
-            "Scenarios",
-            "Save the current inputs as a named scenario; load, run, or delete scenarios. Default scenarios are "
-            "seeded for DISCOM 90% RE, Captive 95% RE, Hybrid 95% RE / 99% CFE, OA 99% RE / 100% CFE.",
-        ),
-        (
-            "Sensitivity",
-            "Runs ±20% tornado analysis on key cost/capacity drivers and a two-variable matrix (solar × BESS energy).",
+            "Guided wizard: General, Data Centre, Load (incl. four load-factor scenarios S1–S4 and optional PROJECT DATA CSV), "
+            "Solar/Wind/BESS/Grid contract steps, Captive architecture (assets + mix % + tariff stacks + Storage ₹/kWh), "
+            "Hybrid architecture (same pattern), Compliance (RPO/RCO single target, ESO single target, hourly CFE), "
+            "Financial (discount rate, escalations, Additional costs). No Optimization step. Save Section / Next / Finish.",
         ),
         (
             "Economics",
-            "TOTAL COST OF DELIVERED ENERGY ₹/kWh, annual cost, CAPEX, NPV/IRR/payback; GRID-ONLY BASELINE (DISCOM) "
-            "panel; Incremental vs DISCOM panel (Δ CAPEX, Δ OPEX Y1, incremental NPV/IRR/payback); cost breakdown chart.",
+            "Tariff-stack bill breakdown for the active Captive or Hybrid tab context: TOTAL COST OF DELIVERED ENERGY ₹/kWh, "
+            "annual bill ₹ Cr, savings vs DISCOM, NPV of savings, Target % vs Simulated energy share "
+            "(cost_blend_basis), and component charts. No plant CAPEX lines.",
+        ),
+        (
+            "Hourly CFE",
+            "8760-hour workspace: Time window (full year / month / week / day), charts for load, RE, grid, BESS, "
+            "curtailment and hourly CFE; monthly energy balance table; CFE heatmap aligned with compliance targets.",
         ),
         (
             "Reports",
-            "Export Excel workbook (incl. Energy Ledger, Feasibility, Data Quality, CFE Analytics, incremental economics), "
-            "PDF executive report (feasibility + binding constraints + DISCOM baseline), or Backup Project (.pto.zip).",
+            "Export Excel workbook and PDF executive summary (feasibility, CFE, Captive/Hybrid comparison, DISCOM baseline, "
+            "LF scenarios, data quality). Backup Project (.pto.zip) for portable restore.",
         ),
         (
             "Assumptions",
-            "Searchable/filterable register of every parameter with value, unit, source and description.",
+            "Searchable register of buyer-facing parameters (tariff stacks, mix %, compliance, load). "
+            "Plant-leftover paths (generation CAPEX/OPEX/MW, financing, optimization) are hidden by design.",
         ),
         (
             "Methodology",
-            "In-app Model 2.0 summary: synthetic vs PROJECT DATA profiles, power balance, SOC/origin tracking, "
-            "RE%/CFE, feasibility/recommendation rules, incremental economics, optimization stages. "
-            "The User Guide Section 17A expands every formula in detail.",
+            "In-app summary of bill blend (Architecture mix), TOD/availability CFE, Annual RE, carbon, "
+            "and NPV of savings vs DISCOM. Section 17A of this guide expands formulas.",
         ),
         (
             "Settings",
-            "Share & access card shows This laptop URL and Network URLs for LAN colleagues (with Copy). "
-            "Also displays application settings (currency, theme, model version, runtime). "
-            "Core equations are not editable here.",
+            "Share & access: This laptop URL and Network URLs for LAN colleagues (Copy). Application metadata "
+            "(currency, theme, model version). Core equations are not editable here.",
         ),
     ]
     for name, desc in menus:
@@ -739,49 +676,51 @@ def build():
     add_heading(doc, "8. Project Setup Wizard — Step by Step", 1)
     add_para(
         doc,
-        "Open Project Setup. A progress bar and step chips show where you are. The middle asset steps "
-        "(Solar / Wind / BESS / Grid) appear only when those assets are selected under Architecture. "
-        "Always click Save Section (or Next, which also saves) before leaving a step if you changed values. "
-        "Use top-bar Save Project when you want a portable .pto.zip on disk.",
+        "Open Project Setup. Configure both Captive and Hybrid contract profiles here (DISCOM is baseline-only and "
+        "is not selected as an architecture). Always click Save Section (or Next) before leaving a step. "
+        "Use top-bar Save Project for a portable .pto.zip on disk.",
     )
     steps = [
         ("1. General", "Project name, location label, currency, model hours (8760), calendar year, random seed, notes."),
         ("2. Data Centre", "Facility name, IT capacity (MW), grid connection kV (concept note: 220 kV), designated-consumer status."),
         (
             "3. Load",
-            "profile_source (SYNTHETIC | PROJECT DATA), peak load, load factor, load model type, weekday/weekend multipliers, "
-            "month and hour multipliers. If PROJECT DATA, import the CSV under Profiles before simulating.",
+            "profile_source (SYNTHETIC | PROJECT DATA), IT load, PUE, peak load, load-factor scenarios S1–S4 "
+            "(headline KPIs use S1), shape multipliers. Optional PROJECT DATA CSV upload on this step.",
         ),
         (
-            "4–7. Asset steps (conditional)",
-            "Solar / Wind / BESS / Grid editors appear according to Architecture asset checkboxes. "
-            "DISCOM structure shows Grid (DISCOM) only; Captive shows Solar/Wind/BESS; Hybrid and Open Access can show all four.",
+            "4. Solar / Wind / BESS / Grid contracts",
+            "Energy contract inputs: stacked ₹/kWh tariff/PPA lines, contract energy (mix% × annual load), "
+            "synthetic or PROJECT DATA generation shapes, grid import limit and DISCOM tariff/TOD/demand/fixed. "
+            "BESS: Storage tariff ₹/kWh only on Captive/Hybrid (not plant CAPEX).",
         ),
         (
-            "Commercial / Architecture",
-            "Structure selection, include_* asset flags, Asset usage % (mix_discom_pct / mix_solar_pct / "
-            "mix_wind_pct / mix_bess_pct by structure), and structure-specific ownership/price/network flags "
-            "(network charge sections appear per selected asset when each apply_network_charges_to_* flag is True).",
+            "5. Captive architecture",
+            "Asset include flags, Percentage of power (sum 100%), Captive tariff stacks, optional DISCOM share, "
+            "cost_blend_basis, network flags as applicable.",
         ),
         (
-            "Compliance",
-            "RPO/RCO/ESO applicability and targets, Annual RE and Hourly CFE targets and pass mode (drives feasibility). "
-            "This is the only place to edit compliance inputs (removed from the Analysis nav).",
+            "6. Hybrid architecture",
+            "Same pattern as Captive with DISCOM + Solar + Wind + BESS combinations typical for hybrid supply.",
         ),
         (
-            "Financial",
-            "Project life, discount rate, inflation, escalations, residual value, optional financing flags, "
-            "and Additional costs (named annual ₹ line items included in Year-1 cost, ₹/kWh and cashflows).",
+            "7. Compliance",
+            "RPO/RCO single target, ESO single target, Annual RE and Hourly CFE targets and pass mode. "
+            "Dashboard links here for edits.",
         ),
-        ("Optimization", "Objective, dispatch mode, search effort, capacity bounds, constraint toggles, balanced weights."),
+        (
+            "8. Financial",
+            "Project life, discount rate (NPV of savings vs DISCOM), inflation, electricity/RE escalations, "
+            "Additional costs (named annual ₹ lines in the power bill).",
+        ),
     ]
     for title, text in steps:
         add_heading(doc, title, 2)
         add_para(doc, text)
     add_para(
         doc,
-        "Tip: The dedicated Load / Solar / Wind / BESS / Grid menus edit the same data as wizard steps 3–7. "
-        "Use Profiles for CSV import. Use whichever is more convenient.",
+        "Tip: There are no separate Profiles or plant-capacity sidebar tabs — import PROJECT DATA and edit "
+        "contracts entirely within Project Setup.",
     )
 
     doc.add_page_break()
@@ -797,8 +736,7 @@ def build():
     add_heading(doc, "9.0 How parameters appear in the UI", 2)
     add_para(
         doc,
-        "On Project Setup and every direct editor page (Load, Solar, Wind, BESS, Grid, Architecture, "
-        "Compliance, Optimization, etc.), each field is shown as:",
+        "On Project Setup (and Economics / Compliance sub-forms), each field is shown as:",
     )
     add_bullets(
         doc,
@@ -835,7 +773,7 @@ def build():
         "load",
         "9.3 Load",
         "Parameters used to synthesize the 8,760-hour demand profile when profile_source = SYNTHETIC. "
-        "Set profile_source = PROJECT DATA and import a CSV under Profiles to use measured/forecast series instead. "
+        "Set profile_source = PROJECT DATA and upload a CSV on the Load step to use measured/forecast series instead. "
         "You never enter 8,760 rows in the parameter form.",
         rows,
     )
@@ -854,25 +792,23 @@ def build():
         doc,
         "solar",
         "9.4 Solar",
-        "When profile_source = SYNTHETIC, generation is zero at night, peaks near peak_generation_hour, and is scaled to the target CF. "
-        "PROJECT DATA replaces the synthetic series with your imported MW profile (scaled/capacities still apply as configured).",
+        "Solar annual MWh = Load × Solar%. Hourly shape (synthetic sunrise–sunset or PROJECT DATA) is scaled to that "
+        "annual energy — solar ≈ 0 at night. Used for hourly CFE/charts; bill still uses Architecture mix %.",
         rows,
     )
     section_params(
         doc,
         "wind",
         "9.5 Wind",
-        "When profile_source = SYNTHETIC, wind uses monthly factors and deterministic variability seeded by general.random_seed. "
-        "PROJECT DATA uses the imported hourly MW series.",
+        "Wind annual MWh = Load × Wind%. Hourly shape (synthetic or PROJECT DATA) is scaled to that annual energy "
+        "and can serve at night. Used for hourly CFE/charts; bill uses Architecture mix %.",
         rows,
     )
     section_params(
         doc,
         "bess",
         "9.6 BESS",
-        "Physical battery model with power rating (caps both charge and discharge), energy capacity, SOC window, "
-        "and renewable-origin tracking for ESO. Conversion efficiency is ideal (100%) — charge/discharge efficiency "
-        "and separate max charge/discharge power inputs are not used.",
+        "Buyer BESS: Storage tariff × mix % on the bill. If BESS mix > 0, derived storage shifts day RE to night for CFE.",
         rows,
     )
     section_params(
@@ -886,8 +822,10 @@ def build():
         doc,
         "commercial",
         "9.8 Commercial structure parameters",
-        "Controls which commercial cost stack is applied, which assets are included, Asset usage % "
-        "(mix_*_pct — selected assets must sum to 100), ownership/allocation metadata, and network-charge flags.",
+        "Controls which commercial cost stack is applied, which assets are included, Percentage of power "
+        "(mix_*_pct — annual contract energy + bill shares, selected assets must sum to 100; CFE uses TOD shapes), "
+        "cost_blend_basis (TARGET_POWER_PCT and SIMULATED_ENERGY_SHARE both = Architecture mix % on the buyer path), "
+        "ownership/allocation metadata, and network-charge flags.",
         rows,
     )
     section_params(
@@ -906,15 +844,13 @@ def build():
         doc,
         "financial",
         "9.10 Financial parameters",
-        "Cash-flow horizon and discounting. Financing fields are optional (default: financing disabled).",
+        "Cash-flow horizon and discount rate for NPV of bill savings vs DISCOM; inflation and tariff escalations.",
         rows,
     )
-    section_params(
+    add_para(
         doc,
-        "optimization",
-        "9.11 Optimization parameters",
-        "Search bounds and feasibility constraints for capacity optimization.",
-        rows,
+        "Generation-plant CAPEX/OPEX, plant MW sizing, project financing, and optimization parameters are "
+        "omitted from this reference — they are hidden from the Assumptions register in the commercial buyer app.",
     )
 
     doc.add_page_break()
@@ -952,7 +888,7 @@ def build():
             ["PRELIMINARY", "Overall data-quality badge when not all of Load/Solar/Wind are PROJECT DATA (typical early run)."],
             ["PROJECT DATA ANALYSIS", "All three of Load/Solar/Wind are PROJECT DATA."],
             ["Defaults left", "Count of editable parameters still marked DEFAULT_ASSUMPTION (e.g. 197 on a fresh project)."],
-            ["Critical defaults", "High-impact defaults still present (e.g. peak load, CFs, tariffs, CAPEX, compliance applicability)."],
+            ["Critical defaults", "High-impact defaults still present (e.g. peak load, LF, tariffs, compliance applicability)."],
         ],
     )
 
@@ -970,17 +906,17 @@ def build():
             [
                 "Load",
                 "Peak load, load factor, weekday/weekend multipliers and shape settings synthesize hourly MW demand.",
-                "Profiles → upload Load CSV (exactly 8,760 or 8,784 hours) — profile_source becomes PROJECT DATA.",
+                "Project Setup → Load: upload CSV (8,760 or 8,784 hours) — profile_source becomes PROJECT DATA.",
             ],
             [
                 "Solar",
                 "Capacity, target CF, sunrise/sunset, peak hour, seasonal factors and seeded variability.",
-                "Profiles → upload Solar CSV; or set profile_source = PROJECT DATA after a valid import.",
+                "Project Setup → Solar: upload CSV or set profile_source = PROJECT DATA after a valid import.",
             ],
             [
                 "Wind",
                 "Capacity, target CF, monthly factors and deterministic variability (general.random_seed).",
-                "Profiles → upload Wind CSV; Clear returns the series to SYNTHETIC.",
+                "Project Setup → Wind: upload CSV; Clear returns the series to SYNTHETIC.",
             ],
         ],
         col_widths=[1.2, 3.2, 2.6],
@@ -1019,30 +955,37 @@ def build():
     )
 
     # 11 Architectures
-    add_heading(doc, "11. Commercial Architectures, Selectable Assets & Recommendation Rules", 1)
+    add_heading(doc, "11. Captive vs Hybrid — Equal Analysis & DISCOM Baseline", 1)
+    add_para(
+        doc,
+        "The commercial buyer app configures two supply architectures — Captive and Hybrid — under Project Setup. "
+        "Each Run Analysis evaluates both using their saved profiles (assets, mix %, tariff stacks, Storage tariff). "
+        "DISCOM is not selectable: the engine always computes a GRID-ONLY BASELINE bill for savings and NPV context. "
+        "The Dashboard shows a side-by-side comparison table (+ DISCOM column) and CAPTIVE / HYBRID detail tabs. "
+        "There is no RECOMMENDED label, Status recommendation row, or automatic pick of a winning architecture.",
+    )
     add_heading(doc, "11.0 Asset selection (include flags)", 2)
     add_para(
         doc,
-        "On Architecture / Commercial you choose which assets participate. Unselected assets are forced to "
-        "zero capacity in the engine and their Project Setup tabs are hidden.",
+        "Within each architecture profile, tick which assets participate (Solar, Wind, BESS, DISCOM/grid). "
+        "Unselected assets are excluded from that architecture’s bill blend and dispatch contract energy.",
     )
     add_table(
         doc,
-        ["Structure", "Selectable assets"],
+        ["Profile", "Typical assets"],
         [
-            ["DISCOM", "DISCOM / grid only"],
-            ["CAPTIVE", "Solar, Wind, BESS"],
+            ["CAPTIVE", "Solar, Wind, BESS (optional DISCOM backup share)"],
             ["HYBRID", "DISCOM, Solar, Wind, BESS"],
-            ["OPEN_ACCESS", "DISCOM, Solar, Wind, BESS"],
+            ["DISCOM baseline", "Grid only (not user-selectable — computed automatically)"],
         ],
     )
 
-    add_heading(doc, "11.0.1 Asset usage % (mix shares) — detailed", 2)
+    add_heading(doc, "11.0.1 Percentage of power (mix shares) — detailed", 2)
     add_para(
         doc,
-        "After selecting assets on Architecture, set Asset usage % for each selected asset. "
-        "These percentages define how much of each asset’s configured Setup capacity is used in the "
-        "8,760-hour simulation and economics for this architecture case.",
+        "For each architecture (Captive and Hybrid separately), set Percentage of power for each selected asset. "
+        "These percentages are buyer contract shares for the tariff-stack bill and annual Solar/Wind MWh "
+        "(shapes scaled to mix%×load — solar ≈ 0 at night). They do not represent plant MW investment.",
     )
     add_para(doc, "Hard rule — selected assets must sum to 100%", bold=True)
     add_bullets(
@@ -1051,23 +994,26 @@ def build():
             "Only selected assets count toward the sum (unchecked assets are ignored and zeroed by include flags).",
             "The Architecture screen shows a live Total: X% (must equal 100%) — green when valid, red when not.",
             "Save Section / Next / Prev / Save Project block with an alert if the total is not within 0.05 of 100%.",
-            "Simulation validation also errors if Asset usage % for selected assets do not sum to 100.",
-            "DISCOM structure has no mix fields (grid-only; RE/BESS forced to zero).",
+            "Simulation validation also errors if Percentage of power for selected assets do not sum to 100.",
+            "DISCOM baseline uses Grid% = 100, RE% = 0 (no mix editor).",
+            "After a run, Economics shows Target % and Simulated % — both equal Architecture contracted mix "
+            "(Grid% = DISCOM%; RE% = Solar%+Wind%+BESS%).",
+            "commercial.cost_blend_basis: TARGET_POWER_PCT and SIMULATED_ENERGY_SHARE both price Architecture "
+            "contracted mix % × stacked rates (Target = Simulated on the buyer path).",
         ],
     )
     add_para(doc, "UI behaviour", bold=True)
     add_bullets(
         doc,
         [
-            "Switching commercial structure (DISCOM / CAPTIVE / HYBRID / OPEN_ACCESS) resets asset checkboxes "
-            "to sensible defaults and redistributes usage % evenly across the selected set.",
+            "Switching between Captive and Hybrid setup sections keeps separate saved profiles for each architecture.",
             "Toggling an asset chip (include/exclude) redistributes % evenly across the remaining selected assets "
             "so the total stays 100%.",
             "You may then edit individual % values manually as long as the total remains 100.",
             "Only fields for the current structure and selected assets are shown.",
         ],
     )
-    add_para(doc, "Default mix values (new HYBRID / OPEN_ACCESS with all four assets selected)", bold=True)
+    add_para(doc, "Example default mix (Hybrid, all four assets selected)", bold=True)
     add_table(
         doc,
         ["Asset", "Default usage %", "Config key"],
@@ -1087,7 +1033,7 @@ def build():
     )
     add_table(
         doc,
-        ["Structure", "Usage % fields shown", "What each % scales"],
+        ["Structure", "Usage % fields shown", "What each % does"],
         [
             [
                 "DISCOM",
@@ -1096,32 +1042,26 @@ def build():
             ],
             [
                 "CAPTIVE",
-                "Solar % · Wind % · BESS % (sum = 100)",
-                "solar.capacity_mw; wind.capacity_mw; bess.power_mw and bess.energy_mwh",
+                "Solar % · Wind % · BESS % (+ DISCOM % if DISCOM selected); sum = 100",
+                "Contracted shares for bill + annual energy (TOD shapes for CFE)",
             ],
             [
                 "HYBRID",
                 "DISCOM % · Solar % · Wind % · BESS % (selected sum = 100)",
-                "grid.max_import_mw; solar.capacity_mw; wind.capacity_mw; bess.power_mw and energy_mwh",
-            ],
-            [
-                "OPEN_ACCESS",
-                "DISCOM % · Solar % · Wind % · BESS % (selected sum = 100)",
-                "Same scaling as HYBRID",
+                "Contracted shares for bill + annual energy (same rules as Captive)",
             ],
         ],
         col_widths=[1.3, 2.4, 2.8],
     )
-    add_para(doc, "Engine formulas (applied after include-flag zeroing, on a copy of project inputs):", bold=True)
+    add_para(doc, "Engine behaviour (after include-flag zeroing):", bold=True)
     add_bullets(
         doc,
         [
-            "Effective Solar MW = solar.capacity_mw × mix_solar_pct / 100  (if Solar included; else 0)",
-            "Effective Wind MW = wind.capacity_mw × mix_wind_pct / 100  (if Wind included; else 0)",
-            "Effective BESS MW = bess.power_mw × mix_bess_pct / 100",
-            "Effective BESS MWh = bess.energy_mwh × mix_bess_pct / 100  (if BESS included; else both 0)",
-            "Effective Grid max import MW = grid.max_import_mw × mix_discom_pct / 100  "
-            "(HYBRID / OPEN_ACCESS when DISCOM included; CAPTIVE forces grid import to 0)",
+            "Annual Solar/Wind MWh = Load × mix%; hourly shapes keep TOD (solar ~0 at night). "
+            "BESS% billed at Storage tariff; derived storage for night CFE when BESS mix > 0.",
+            "Year-1 energy ₹ = Load × (Discom×G% + Solar×S% + Wind×W% + Storage×B%) — both cost-blend bases "
+            "use Architecture contracted mix %.",
+            "BESS on Captive/Hybrid: single Storage tariff ₹/kWh (excel_bess_ppa_inr_per_kwh) — not plant CAPEX/MW.",
             "Config keys: commercial.mix_discom_pct, mix_solar_pct, mix_wind_pct, mix_bess_pct "
             "(each 0–100; selected assets must sum to 100)",
         ],
@@ -1130,69 +1070,56 @@ def build():
     add_bullets(
         doc,
         [
-            "HYBRID, Solar capacity 450 MW, Solar usage 50% → simulation uses 225 MW solar "
-            "(CAPEX/OPEX and profiles follow effective capacity).",
-            "CAPTIVE with Solar 50% + Wind 30% + BESS 20% = 100%: Solar 400 MW → 200 MW; "
-            "Wind 200 MW → 60 MW; BESS 100 MW / 400 MWh → 20 MW / 80 MWh; grid import = 0.",
-            "HYBRID with Wind unchecked: only DISCOM + Solar + BESS appear; those three % must sum to 100 "
-            "(e.g. 25 / 50 / 25).",
-            "Optimization capacity overrides (when used) set absolute MW after this mix scaling step.",
+            "CAPTIVE with Solar 50% + Wind 30% + BESS 20%: bill uses those shares; night CFE needs wind/BESS.",
+            "Hybrid with Wind unchecked: DISCOM + Solar + BESS % must sum to 100 (e.g. 25 / 50 / 25).",
+            "Bill Target Grid%|RE% = Simulated = Architecture mix; hourly CFE follows availability.",
         ],
     )
     add_para(
         doc,
         "Note: captive_ownership_pct and captive_allocation_pct remain commercial metadata for contracts; "
-        "they do not replace Asset usage %. Usage % is what scales physical capacities in the model.",
+        "they do not replace Percentage of power.",
     )
 
-    add_heading(doc, "11.1 DISCOM — GRID-ONLY BASELINE", 2)
+    add_heading(doc, "11.1 DISCOM — GRID-ONLY BASELINE (not selectable)", 2)
     add_para(
         doc,
-        "Data Centre → MSEDCL/DISCOM → Grid. RE and BESS capacities are treated as zero for the DISCOM "
-        "energy path so the case represents full grid supply economics. Asset usage % fields are not shown. "
-        "Therefore Annual RE % and Hourly CFE min show 0% by design (not a calculation error). "
-        "Costs include energy (TOD if enabled), demand and fixed charges, plus any applicable compliance cost "
-        "and DISCOM network charges when enabled. "
-        "IRR and Payback typically show “—” for DISCOM because cashflows are all costs with no RE CAPEX "
-        "investment to recover; NPV of DISCOM is the present value of grid electricity bills (often large and negative). "
-        "On the Dashboard architecture card, DISCOM is labelled GRID-ONLY BASELINE — never RECOMMENDED when "
-        "RE/CFE targets are missed (which they are by design at 0%).",
+        "Full grid supply economics for the same load and LF scenario S1: stacked DISCOM ₹/kWh, demand on peak "
+        "import, fixed charges, compliance. Grid% = 100, RE% = 0; Annual RE and Hourly CFE min are 0% by design. "
+        "Shown as its own column in the Dashboard comparison and on Economics as the reference bill. "
+        "Savings vs DISCOM and NPV of savings are measured against this baseline — not against plant CAPEX.",
     )
-    add_heading(doc, "11.2 Captive / Group Captive", 2)
+    add_heading(doc, "11.2 Captive / Group Captive profile", 2)
     add_para(
         doc,
-        "Avaada RE project style captive structure into the Data Centre. Select any combination of Solar, Wind "
-        "and BESS, then set Solar / Wind / BESS usage % so selected values sum to 100% (each % scales configured capacity). "
-        "Ownership % and allocation % are commercial inputs — the tool does not certify captive legal qualification. "
-        "Energy may be priced via captive_energy_price with optional per-asset network charges and losses on the "
-        "selected Solar/Wind/BESS assets. DISCOM/grid is not part of the Captive asset picker.",
+        "Captive-style supply contracts: Solar, Wind, BESS (Storage tariff), optional DISCOM backup share. "
+        "Stacked ₹/kWh lines mirror Excel Captive/OA charge components for each asset. "
+        "Ownership/allocation metadata is stored for reporting — the tool does not certify captive legal qualification. "
+        "Bill shares use Architecture mix %. Annual RE % and Hourly CFE use TOD availability.",
     )
-    add_heading(doc, "11.3 Hybrid (primary optimization architecture)", 2)
+    add_heading(doc, "11.3 Hybrid profile", 2)
     add_para(
         doc,
-        "Selected combination of Solar + Wind + BESS + DISCOM/grid serving the Data Centre. Set DISCOM %, "
-        "Solar %, Wind % and BESS % for each selected asset so the selected total equals 100%. "
-        "This is the default structure and the primary "
-        "architecture contemplated for least-cost optimization under RE/CFE constraints.",
+        "Hybrid supply combines DISCOM grid backup with contracted Solar, Wind and BESS Storage. "
+        "Mix % and tariff stacks are edited separately from Captive so both can be compared on equal footing after each Run Analysis.",
     )
-    add_heading(doc, "11.4 Open Access", 2)
-    add_para(
+    add_heading(doc, "11.4 Storage tariff & charge stacks", 2)
+    add_bullets(
         doc,
-        "RE generators → OA / transmission network → Data Centre (with optional DISCOM backup). Same asset "
-        "picker and usage % fields as HYBRID (DISCOM / Solar / Wind / BESS). Uses oa_energy_price "
-        "plus configurable per-asset network charges when those flags are enabled.",
+        [
+            "Captive/Hybrid BESS: one user-facing Storage ₹/kWh (excel_bess_ppa_inr_per_kwh). Zero means no BESS energy cost in the bill.",
+            "Solar/Wind: PPA + energy + wheeling + transmission + losses + CSS + AS + SLDC + banking + ED + TOSE stacks as configured.",
+            "DISCOM: energy + wheeling + TOD + duty + TOSE (+ demand/fixed from Grid setup).",
+            "Network charge flags may add per-asset ₹/kWh where enabled for legacy/open-access style lines.",
+        ],
     )
-    add_heading(doc, "11.5 Architecture Comparison & RECOMMENDED label", 2)
+    add_heading(doc, "11.5 Dashboard comparison (no recommendation)", 2)
     add_para(
         doc,
-        "On the Architecture page (and on the Dashboard scenario table), Run Architecture Comparison / Refresh "
-        "simulates all four structures with the current project inputs (structure-specific include flags, "
-        "asset usage % scaling, and capacity zeroing applied where required) and shows a side-by-side table of "
-        "Solar/Wind/BESS/Grid MW, Annual RE %, Hourly CFE, Grid GWh, curtailment, BESS utilization, ₹/kWh, "
-        "NPV, IRR, payback, and feasibility status. "
-        "RECOMMENDED is assigned only to a feasible architecture with the lowest delivered-energy cost among "
-        "feasible options. If none are feasible, the UI shows NO FEASIBLE RECOMMENDATION (lowest-cost row may "
-        "still be highlighted as a cost reference only). Footnotes explain DISCOM 0% RE/CFE and blank IRR/Payback.",
+        "After Run Analysis the Dashboard lists Captive and Hybrid side by side with DISCOM baseline metrics: "
+        "₹/kWh, annual bill ₹ Cr, savings vs DISCOM, NPV of savings, Annual RE %, Hourly CFE min, feasibility status. "
+        "Use CAPTIVE / HYBRID tabs for charts and KPI detail. The UI does not show RECOMMENDED, "
+        "NO FEASIBLE RECOMMENDATION, or a Status row that picks a winner — you compare numbers directly.",
     )
 
     # 12 Compliance
@@ -1210,53 +1137,48 @@ def build():
         "If Unknown or Not Applicable, the engine does not invent a legal conclusion. Unknown displays as "
         "LEGAL REVIEW REQUIRED style status rather than Pass.",
     )
-    add_heading(doc, "12.2 RPO", 2)
+    add_heading(doc, "12.2 RPO / RCO (single combined target)", 2)
     add_para(
         doc,
-        "Configurable solar/wind/hydro/other targets. Concept note does not hard-code numeric RPO splits — "
-        "defaults are 0% until you enter jurisdiction-specific targets. Shortfall can incur rpo_buyout cost if Applicable.",
+        "The commercial UI uses a single RPO/RCO target percentage (not separate solar/wind/hydro buckets). "
+        "Set applicability, the combined target, and buyout/REC costs if Applicable. "
+        "Do not treat model Pass/Fail as a legal RCO Designated Consumer determination.",
     )
-    add_heading(doc, "12.3 RCO", 2)
+    add_heading(doc, "12.3 ESO (single target)", 2)
     add_para(
         doc,
-        "Configurable target, compliance route (Unknown / Self-generation / REC / Buyout / Other) and costs. "
-        "The concept note specifically questions whether a 220 kV Data Centre SPV is a Designated Consumer — "
-        "do not treat model output as that determination.",
+        "Single ESO target percentage for the study year (trajectory defaults from concept note unless you override). "
+        "Renewable-origin stored energy requirement defaults to ≥ 85% (concept note). Select active ESO year in Setup.",
     )
-    add_heading(doc, "12.4 ESO", 2)
+    add_heading(doc, "12.4 Hourly CFE targets", 2)
     add_para(
         doc,
-        "Trajectory from concept note: FY2026-27 = 2.5% rising to FY2029-30 = 4.0% (intervening years are "
-        "DEFAULT ASSUMPTION interpolations). Select eso_active_year for the study. Renewable-origin stored "
-        "energy requirement defaults to ≥ 85% (concept note).",
+        "Hourly CFE target and pass mode drive feasibility alongside Annual RE %. Edit under the same Compliance step.",
     )
     add_heading(doc, "12.5 Annual RE % vs Hourly CFE % (and CFE analytics)", 2)
     add_bullets(
         doc,
         [
-            "Annual RE % = sum of renewable energy serving load / total load energy × 100 (energy-based, not capacity-based).",
-            "In this model, energy-weighted CFE ≡ Annual RE % (same numerator/denominator).",
-            "Hourly CFE % = renewable energy serving load in that hour / load in that hour × 100, with BESS discharge credited by tracked RE-origin share.",
-            "They are related but not the same as the pass-mode metric — do not treat min hourly CFE and annual RE as interchangeable.",
+            "Annual RE % = Σ RE serving load / Σ Load × 100 (availability — direct Solar+Wind + RE-origin BESS).",
+            "Hourly CFE % = Min(Load, Solar_t + Wind_t + RE-BESS_discharge_t) / Load × 100. "
+            "Solar ≈ 0 at night; night CFE comes from wind and/or BESS.",
+            "Energy-weighted CFE ≡ Annual RE % (same matched CF / load). Min hourly CFE is often below Architecture RE mix %.",
             "CFE pass modes: All hours >= target | Mean hourly CFE >= target | Share of hours >= target.",
-            "Default pass mode All hours >= target is a strict 24×7 rule. The demo 250 MW plant often Fails "
-            "Annual RE (≈81% vs 90% target) and Hourly CFE (night hours drop well below 90%) until BESS/wind "
-            "is increased or targets/pass mode are relaxed under Project Setup → Compliance.",
+            "Default All hours >= target is a strict 24×7 rule. Fail at night usually means raise Wind/BESS mix, "
+            "improve shapes, or relax the target — not pretend solar is on at night.",
             "Dashboard CFE Pass Mode card shows: mode, target, min hour, % hours ≥ target, longest continuous deficit streak (hours), max deficit (pp).",
             "Dashboard Compliance Status shows actual vs target and a short “Why Fail?” note when status is Fail.",
-            "CFE heatmap uses an absolute 0–100% colour scale (coral → amber → teal/green) so low night CFE "
-            "reads clearly; the compliance target is marked on the colour bar.",
+            "CFE heatmap uses an absolute 0–100% colour scale; night hours often read lower than daytime.",
         ],
     )
 
     doc.add_page_break()
 
     # 12A Profiles
-    add_heading(doc, "12A. Profiles — Optional PROJECT DATA CSV Import", 1)
+    add_heading(doc, "12A. Optional PROJECT DATA CSV Import (Project Setup)", 1)
     add_para(
         doc,
-        "Open Profiles from the left navigation (Project group). For each of Load, Solar and Wind you can keep "
-        "SYNTHETIC generation or upload a PROJECT DATA series.",
+        "On Project Setup steps for Load, Solar and Wind you can keep SYNTHETIC generation or upload a PROJECT DATA CSV.",
     )
     add_heading(doc, "12A.1 Accepted file format", 2)
     add_bullets(
@@ -1267,7 +1189,7 @@ def build():
             "Exactly 8,760 data rows for a non-leap year (or 8,784 for leap) — no more, no less.",
             "timestamp: unique hourly stamps (ISO recommended), e.g. 2025-01-01T00:00:00",
             "mw: non-negative finite number (megawatts). No blanks, no text, no NaN.",
-            "Download ready-made templates from the Profiles page: Load / Solar / Wind template CSVs "
+            "Download ready-made templates from Project Setup (or docs/samples/): Load / Solar / Wind template CSVs "
             "(also in docs/samples/ and frontend/dist/samples/). Keep timestamps; replace the mw column with your data.",
         ],
     )
@@ -1296,34 +1218,31 @@ def build():
     )
 
     # 13 Simulation
-    add_heading(doc, "13. Running the 8,760-Hour Simulation & Energy Ledger", 1)
+    add_heading(doc, "13. Running Analysis, Dashboard & Hourly CFE", 1)
     add_heading(doc, "13.1 How to run", 2)
     add_numbered(
         doc,
         [
             "Ensure the correct project is open and inputs are saved.",
-            "If using PROJECT DATA, confirm Profiles uploaded successfully.",
-            "Click Run 8760 Simulation in the top bar (works from any page).",
-            "Wait for completion (typically a few seconds for rule-based dispatch).",
-            "You are taken to the Dashboard with Feasibility / Data Quality / CFE cards and KPIs.",
-            "Open Energy Ledger to verify reconciliation OK before presenting numbers.",
+            "If using PROJECT DATA, confirm CSV upload on the relevant Project Setup step.",
+            "Click Run 8760 Simulation in the top bar (Run Analysis — works from any page).",
+            "Wait for completion (typically a few seconds per architecture × LF scenarios).",
+            "Review Dashboard: Captive vs Hybrid table, DISCOM baseline column, S1 headline KPIs.",
+            "Open Hourly CFE for time-window charts and monthly energy balance.",
         ],
     )
     add_heading(doc, "13.2 What the engine does (Model 2.0)", 2)
     add_numbered(
         doc,
         [
-            "Resolve each profile: SYNTHETIC generator or PROJECT DATA import (error if PROJECT DATA missing/invalid).",
-            "Generate/load 8,760-hour load, solar and wind series (deterministic seed for synthetic).",
-            "Dispatch each hour with explicit flows: solar/wind → load, → BESS, → curtailment; BESS discharge with "
-            "solar/wind/grid origin tracking; grid on residual; unserved if still short.",
-            "Validate hourly power balance, SOC bounds, energy identities and finite values — MODEL ERROR on hard failure.",
-            "Build Energy Ledger (annual + monthly) and SHA-256 config fingerprint.",
-            "Compute KPIs, CFE analytics, monthly balance, compliance, feasibility and financials.",
-            "Also compute a DISCOM GRID-ONLY BASELINE for incremental economics.",
+            "Build DC load for each LF scenario (S1–S4) from Seasonal TOD / study period (demand shape only).",
+            "Scale Solar/Wind shapes to annual mix%×load; derive BESS storage if BESS mix > 0; set DISCOM grid cap.",
+            "Dispatch hourly: RE to load, charge BESS from excess, discharge at deficit, DISCOM residual.",
+            "Validate finite values — MODEL ERROR on hard failure. Commercial unserved_mwh = 0 (feasibility ignores profile unserved).",
+            "Compute availability CFE/RE, compliance, feasibility, tariff-stack economics (Architecture mix bill) and savings vs DISCOM.",
         ],
     )
-    add_heading(doc, "13.3 8760 Simulation page — Time window controls (detailed)", 2)
+    add_heading(doc, "13.3 Hourly CFE page — Time window controls (detailed)", 2)
     add_para(
         doc,
         "The chart toolbar is designed for non-technical users. It no longer shows a raw “Day = 180” "
@@ -1361,7 +1280,7 @@ def build():
             [
                 "Monthly Energy Balance table",
                 "Appears after a simulation exists.",
-                "Month-wise load, solar, wind, BESS, grid, curtailment, RE%, CFE.",
+                "Month-wise load, available Solar/Wind/BESS/DISCOM, RE%, hourly CFE.",
             ],
         ],
     )
@@ -1376,29 +1295,26 @@ def build():
             "Run a simulation first; otherwise Show charts asks you to run one.",
         ],
     )
-    add_heading(doc, "13.4 Energy Ledger page — how to read it", 2)
+    add_heading(doc, "13.4 Load-factor scenarios (S1–S4)", 2)
     add_para(
         doc,
-        "The Energy Ledger is the audit trail for the latest simulation. Annual table lists every major flow in MWh and GWh. "
-        "Reconciliation checks solar identity, wind identity, load identity and AC balance against a tight tolerance. "
-        "Status OK / Fail is shown as a pill. Monthly table lists each month’s AC gap and curtailment. "
-        "Config hash is printed for traceability. If ledger is missing, re-run the simulation (older runs before V2 "
-        "may need a fresh run).",
+        "Project Setup → Load defines up to four load-factor scenarios (load_factor_s1_pct … s4_pct). "
+        "Each Run Analysis evaluates all configured scenarios. Dashboard headline KPIs, primary ₹/kWh, and "
+        "the Captive vs Hybrid comparison table use S1 unless you drill into another scenario in exports or detail panels.",
     )
-    add_heading(doc, "13.5 Dashboard KPI cards", 2)
+    add_heading(doc, "13.5 Dashboard KPI cards (S1 headline)", 2)
     add_table(
         doc,
         ["KPI", "Meaning"],
         [
-            ["Annual RE", "Year energy RE serving load / total load"],
-            ["Hourly CFE (min)", "Minimum hourly CFE across the year; subtext shows CFE pass mode Pass/Fail"],
-            ["Grid Import", "Annual grid energy in GWh"],
-            ["BESS", "Configured power MW / energy MWh and utilization"],
-            ["Curtailment", "Curtailed RE as % of RE generation"],
-            ["Cost ₹/kWh", "TOTAL COST OF DELIVERED ENERGY (annualised cost / load energy)"],
-            ["NPV ₹ Cr", "Net present value; incremental vs DISCOM for non-DISCOM structures"],
-            ["IRR", "Project IRR if defined (often — for pure DISCOM cost stack)"],
-            ["Payback", "Simple/model payback years if defined"],
+            ["Annual RE", "Energy-weighted RE serving load / load (availability)"],
+            ["Hourly CFE (min)", "Min hourly CFE from Solar+Wind+RE-BESS; Pass/Fail vs target"],
+            ["Grid Import", "Annual DISCOM import from dispatch (GWh)"],
+            ["BESS", "Bill: Storage tariff × mix %. Hourly: derived storage when BESS mix > 0"],
+            ["Cost ₹/kWh", "TOTAL COST OF DELIVERED ENERGY (Year-1 bill ÷ load kWh)"],
+            ["NPV ₹ Cr", "Present value of bill savings vs DISCOM baseline (Captive/Hybrid)"],
+            ["Savings vs DISCOM", "Year-1 bill delta vs GRID-ONLY BASELINE (₹ Cr)"],
+            ["LF scenario", "Headline row uses S1; other scenarios in run metadata / exports"],
         ],
     )
 
@@ -1437,26 +1353,27 @@ def build():
     add_heading(doc, "13B. Feasibility Status & Binding Constraints", 1)
     add_para(
         doc,
-        "Every simulation returns a unified feasibility object. The Dashboard Feasibility card is the authoritative "
-        "status for whether the current architecture can be labelled RECOMMENDED.",
+        "Every simulation returns a unified feasibility object per architecture. The Dashboard Feasibility card "
+        "summarises whether enabled RE/CFE (and Applicable RPO/ESO) checks pass — it does not select Captive vs Hybrid. "
+        "Plant-profile unserved energy is not a buyer-path gate (commercial unserved_mwh = 0).",
     )
     add_table(
         doc,
-        ["Status", "Meaning", "can_recommend?"],
+        ["Status", "Meaning"],
         [
-            ["FEASIBLE", "Enabled technical/compliance targets met; no hard model error.", "Yes — may show RECOMMENDED"],
-            ["NOT FEASIBLE", "RE target miss, CFE pass-mode fail, and/or unserved energy > 0 (among other binding issues).", "No"],
-            ["INCOMPLETE INPUTS", "Editable DEFAULT_ASSUMPTION values remain (preliminary / not investment-ready).", "No"],
-            ["LEGAL REVIEW REQUIRED", "RPO/RCO/ESO applicability still requires legal review (and technical pass).", "No"],
-            ["MODEL ERROR", "Internal validation failed (balance/SOC/NaN). Do not use results.", "No"],
+            ["FEASIBLE", "Enabled technical/compliance targets met; no hard model error."],
+            ["NOT FEASIBLE", "RE target miss and/or CFE pass-mode fail (Architecture mix below target), or Applicable RPO/ESO fail."],
+            ["INCOMPLETE INPUTS", "Editable DEFAULT_ASSUMPTION values remain (preliminary / not board-ready)."],
+            ["LEGAL REVIEW REQUIRED", "RPO/RCO/ESO applicability still requires legal review."],
+            ["MODEL ERROR", "Internal validation failed (balance/SOC/NaN). Do not use results."],
         ],
     )
     add_heading(doc, "13B.1 Binding constraints", 2)
     add_para(
         doc,
-        "When not feasible, the card lists binding items such as ANNUAL_RE, HOURLY_CFE, UNSERVED, RPO, RCO, ESO "
-        "with actual vs target and suggested remedies (increase BESS/wind, relax target/pass mode, raise grid, etc.). "
-        "An approximate extra BESS MWh hint may appear for CFE deficits — it is a heuristic, not a guarantee.",
+        "When not feasible, the card lists binding items such as ANNUAL_RE, HOURLY_CFE, RPO, RCO, ESO "
+        "with actual vs target. Remedies: raise Solar/Wind/BESS mix %, or relax the target / pass mode under "
+        "Project Setup → Compliance — not plant MW sizing.",
     )
     add_heading(doc, "13B.2 Stale results", 2)
     add_para(
@@ -1465,111 +1382,38 @@ def build():
         "results_stale = true and a red STALE RESULTS banner appears. Re-run before exporting board packs.",
     )
 
-    # 14 Optimization
-    add_heading(doc, "14. Optimization, Explainability & Marginal Analysis", 1)
-    add_numbered(
-        doc,
-        [
-            "Open Optimization.",
-            "Choose objective: Minimum Cost (default / concept-note primary), Maximum RE, Maximum CFE, "
-            "Minimum Grid Dependency, Compliance First, or Balanced (uses weights).",
-            "Choose dispatch mode: Rule-Based (default, fast) or LP Dispatch (SciPy HiGHS weekly blocks).",
-            "Choose search mode: Quick / Standard / Thorough (more candidates = longer runtime).",
-            "Set capacity bounds and steps for solar, wind, BESS power/energy and grid.",
-            "Toggle enforce_re_target, enforce_cfe_target, enforce_no_unserved as needed. "
-            "Note: strict 24×7 CFE enforcement is demanding — default CFE enforce is off.",
-            "Click Save, then Run Optimization.",
-            "Watch progress: scenario, iteration, best ₹/kWh, feasible count.",
-            "Use Cancel if you need to stop.",
-            "Review Top Feasible Solutions table, recommendation label, and WHY THIS CONFIGURATION? bullets.",
-            "Optionally click Run Marginal Capacity Steps for +50 MW solar / +50 MW wind / +100 MWh BESS / +25 MW BESS power deltas.",
-        ],
-    )
+    # 14 Economics & reports
+    add_heading(doc, "14. Economics, Savings vs DISCOM & Reports", 1)
+    add_heading(doc, "14.1 Economics page", 2)
     add_para(
         doc,
-        "If no feasible solution exists, the UI shows NO FEASIBLE SOLUTION with primary binding constraint, "
-        "message and remedies (RE/CFE too high, BESS too small, RE/grid limits, compliance, commercial constraints) — "
-        "not a bare 'Optimization failed' message. Infeasible winners are never labelled RECOMMENDED.",
+        "Requires a completed Run Analysis. Shows TOTAL COST OF DELIVERED ENERGY ₹/kWh (tariff-stack bill), "
+        "annual bill ₹ Cr, component breakdown (grid/solar/wind/storage/demand/fixed/compliance), "
+        "Target Architecture % and Simulated % (both equal contracted mix on the buyer path), carbon/CFE outcomes, "
+        "and NPV of cumulative bill savings vs DISCOM. No generation-plant CAPEX lines.",
     )
+    add_heading(doc, "14.2 GRID-ONLY BASELINE (DISCOM) panel", 2)
     add_para(
         doc,
-        "Algorithm (transparent staged approach): capacity screening → feasibility screening → "
-        "full 8,760 dispatch + economic evaluation per candidate → ranking → local neighborhood refine → top 10. "
-        "Project-data profiles (if selected) are used for every candidate via the project_id path.",
+        "Reference grid-only bill for the same load and LF scenario. Use for savings ₹ Cr and NPV of savings — "
+        "not as a selectable supply architecture.",
     )
-    add_heading(doc, "14.1 Explainability fields", 2)
-    add_bullets(
-        doc,
-        [
-            "Headline: WHY THIS CONFIGURATION?",
-            "Bullets: capacities, RE/CFE status, grid/curtail/unserved, delivered-energy cost and NPV, CFE stress note.",
-            "Nearby alternatives: feasible-but-worse vs infeasible with binding reasons.",
-            "Marginal steps: Δ ₹/kWh, Δ RE pp, Δ CFE min pp, Δ grid GWh, feasibility flag.",
-        ],
-    )
-
-    # 15 Scenarios & sensitivity
-    add_heading(doc, "15. Scenarios & Sensitivity", 1)
-    add_heading(doc, "15.1 Scenarios", 2)
-    add_bullets(
-        doc,
-        [
-            "Save Current as Scenario — stores a named snapshot of the full config.",
-            "Load — writes that scenario’s config into the active project inputs (marks prior results stale).",
-            "Run — loads the scenario and immediately runs an 8,760 simulation, then opens Dashboard.",
-            "Delete — removes the scenario record.",
-        ],
-    )
-    add_para(doc, "Seeded examples:")
-    add_bullets(
-        doc,
-        [
-            "DISCOM – 90% RE",
-            "CAPTIVE – 95% RE",
-            "HYBRID – 95% RE / 99% CFE",
-            "OPEN ACCESS – 99% RE / 100% CFE",
-        ],
-    )
-    add_heading(doc, "15.2 Sensitivity", 2)
+    add_heading(doc, "14.3 Captive vs Hybrid on Economics", 2)
     add_para(
         doc,
-        "Click Run Sensitivity. The engine varies key drivers (solar/wind/BESS cost, grid tariff, load factor, "
-        "capacities, discount rate, escalations, etc.) by ±20%, plots a tornado on ₹/kWh, and shows a "
-        "two-variable matrix for solar capacity × BESS energy.",
+        "Switch context with Dashboard CAPTIVE / HYBRID tabs (or architecture selector on Economics). "
+        "Each profile shows its own stacked tariffs, Architecture Grid% | RE% (Target = Simulated), and feasibility notes.",
     )
-
-    # 16 Economics & reports
-    add_heading(doc, "16. Economics (Incremental vs DISCOM) & Reports", 1)
-    add_heading(doc, "16.1 Economics page", 2)
-    add_para(
-        doc,
-        "Requires a completed simulation. Shows TOTAL COST OF DELIVERED ENERGY ₹/kWh, annual cost, CAPEX, "
-        "NPV/IRR/payback (basis noted: incremental_vs_discom or standalone_cost_stack), cost-breakdown chart "
-        "and raw breakdown JSON.",
-    )
-    add_heading(doc, "16.2 GRID-ONLY BASELINE (DISCOM) panel", 2)
-    add_para(
-        doc,
-        "Shows DISCOM comparator cost ₹/kWh and annual cost, with the reason that solar/wind/BESS are forced to 0 MW. "
-        "Use this as the bill baseline for investment cases — not as a RE/CFE architecture.",
-    )
-    add_heading(doc, "16.3 Incremental vs DISCOM panel", 2)
-    add_para(
-        doc,
-        "Shows incremental CAPEX, year-1 incremental OPEX, and incremental NPV / IRR / payback derived from "
-        "cashflows = −ΔCAPEX then annual DISCOM_cost − architecture_cost. For non-DISCOM structures, the "
-        "headline NPV/IRR/payback on Dashboard and Economics use these incremental cashflows.",
-    )
-    add_heading(doc, "16.4 Reports page", 2)
+    add_heading(doc, "14.4 Reports page", 2)
     add_table(
         doc,
         ["Button", "Output (Model 2.0)"],
         [
             [
                 "Export Excel",
-                "Summary (incl. feasibility, data quality, config hash, stale flag), Project, Assumptions, "
-                "Load/Solar/Wind/BESS/Grid, 8760 note, Monthly, Compliance, Economics (+ incremental + DISCOM baseline), "
-                "Data Quality, Feasibility (+ binding table), Energy Ledger, Ledger Monthly, CFE Analytics.",
+                "Summary (feasibility, data quality, config hash, stale flag), Project, Assumptions, "
+                "Load/Solar/Wind/BESS/Grid contracts, Monthly, Compliance, Economics (Captive/Hybrid + DISCOM baseline), "
+                "LF scenarios, Data Quality, Feasibility (+ binding table), CFE Analytics.",
             ],
             [
                 "Export PDF",
@@ -1585,22 +1429,133 @@ def build():
     add_para(doc, "Report disclaimer (always included):", bold=True)
     add_para(doc, DISCLAIMER, italic=True)
 
-    # 17 Assumptions / methodology / settings
-    add_heading(doc, "17. Assumptions, Methodology & Settings", 1)
-    add_heading(doc, "17.1 Assumptions register", 2)
+    # 15 Assumptions / methodology / settings
+    add_heading(doc, "15. Assumptions, Methodology & Settings", 1)
     add_para(
         doc,
-        "Filter by CONCEPT_NOTE / DEFAULT_ASSUMPTION / USER_INPUT / CALCULATED and search by parameter name. "
-        "Use this before any management presentation to audit what is still a default.",
+        "The in-app Assumptions and Methodology pages (Reports menu) are the live companion to this chapter. "
+        "They refresh from the open project: study period, mix %, Storage tariff, cost blend basis, and compliance targets.",
     )
-    add_heading(doc, "17.2 Methodology (overview)", 2)
+
+    add_heading(doc, "15.1 Assumptions register", 2)
     add_para(
         doc,
-        "Model 2.0 equations are summarised in the in-app Methodology page and in full detail in "
-        "Section 17A below (and in MODEL_METHODOLOGY.md / ASSUMPTIONS.md). "
-        "Every KPI on the Dashboard is calculated — never hard-coded.",
+        "Assumptions is the searchable register of parameters that drive Captive and Hybrid on the commercial "
+        "buyer path. The data centre is an energy consumer: Solar / Wind / BESS / DISCOM are contracted "
+        "Architecture mix % at fixed ₹/kWh for the bill; hourly CFE uses TOD availability. Generation-plant CAPEX / OPEX, "
+        "plant financing, and optimization leftovers are hidden by design.",
     )
-    add_heading(doc, "17.3 Settings — Share & access", 2)
+    add_para(doc, "Source tags", bold=True)
+    add_table(
+        doc,
+        ["Source", "Meaning"],
+        [
+            ["CONCEPT_NOTE", "Stated in the product concept note (still editable unless locked)."],
+            ["DEFAULT_ASSUMPTION", "Starter value — replace with your project data before decisions."],
+            ["USER_INPUT", "Value you entered or saved from Project Setup."],
+            ["CALCULATED", "Derived by the model (e.g. peak = IT × PUE, stack totals)."],
+        ],
+    )
+    add_para(doc, "Input groups you configure", bold=True)
+    add_table(
+        doc,
+        ["Group", "What it controls", "Notes"],
+        [
+            [
+                "General / study period",
+                "Start–end month, calendar year, model hours",
+                "Top bar study period drives analysis hours.",
+            ],
+            [
+                "Load",
+                "IT load, PUE, peak, Seasonal TOD, LF S1–S4",
+                "Peak = IT × PUE. Demand shape only — not Solar/Wind plant CF. KPIs use S1.",
+            ],
+            [
+                "Architecture — Captive",
+                "Solar / Wind / BESS flags, mix %, Solar/Wind stacks, Storage tariff",
+                "No DISCOM. Selected mix % must sum to 100%. Bill = mix %; CFE = availability.",
+            ],
+            [
+                "Architecture — Hybrid",
+                "DISCOM + Solar / Wind / BESS flags, mix %, all stacks",
+                "DISCOM share is contracted grid %. Baseline savings use 100% DISCOM elsewhere.",
+            ],
+            [
+                "Charge stacks",
+                "DISCOM / Solar / Wind ₹/kWh line items",
+                "Totals calculated. BESS on Captive/Hybrid = Storage tariff only.",
+            ],
+            [
+                "Cost blend basis",
+                "TARGET_POWER_PCT vs SIMULATED_ENERGY_SHARE",
+                "Both = Architecture contracted mix % (Target = Simulated).",
+            ],
+            [
+                "Compliance",
+                "Annual RE, hourly CFE, RPO/RCO, ESO, grid EF",
+                "Annual RE / CFE = availability; RPO = Architecture mix. Project Setup → Compliance.",
+            ],
+            [
+                "Financial (results)",
+                "Discount rate, electricity / RE escalation, project life",
+                "NPV of savings vs DISCOM. No generation-plant debt / CAPEX path.",
+            ],
+        ],
+    )
+    add_para(doc, "Bill vs hourly CFE", bold=True)
+    add_bullets(
+        doc,
+        [
+            "Bill: Architecture mix % × stacked ₹/kWh (Storage tariff × BESS%).",
+            "Hourly: Solar/Wind shapes scaled to annual mix%×load — solar ≈ 0 at night.",
+            "BESS: Mix % on the bill; derived storage shifts day RE to night for CFE.",
+            "CFE: Min(Load, Solar+Wind+RE-BESS)/Load each hour — not flat Architecture RE%.",
+        ],
+    )
+    add_para(doc, "What drives Dashboard / Economics / Hourly CFE", bold=True)
+    add_bullets(
+        doc,
+        [
+            "Both architectures — Captive and Hybrid are analysed in one Run Analysis. Tabs only switch detail view.",
+            "Blended ₹/kWh — Discom×G% + Solar×S% + Wind×W% + (BESS×Storage tariff if BESS selected).",
+            "Target vs Simulated — Both = Architecture contracted mix % (Grid% | RE%).",
+            "Annual RE / hourly CFE — availability (Solar+Wind+RE-BESS). Architecture mix shown for bill reference.",
+            "RPO — Architecture RE mix. ESO — load × BESS mix %. Carbon: baseline = load×EF; actual = load×DISCOM%×EF.",
+            "Feasibility — Gates on RE/CFE (and Applicable RPO/ESO) — not on plant-profile unserved.",
+            "Hidden from the register — generation CAPEX / OPEX, plant MW, plant financing, Optimization leftovers.",
+        ],
+    )
+
+    add_heading(doc, "15.2 Methodology (detailed — matches in-app page)", 2)
+    add_para(
+        doc,
+        "Methodology documents commercial buyer calculation rules: Architecture mix % for the bill, "
+        "TOD/availability for hourly CFE. Summary of sections (full formulas also in §17A and MODEL_METHODOLOGY.md):",
+    )
+    add_numbered(
+        doc,
+        [
+            "Product scope — Captive + Hybrid equal analysis; DISCOM = savings baseline; no recommendation / Status row; "
+            "no plant CAPEX/OPEX as commercial inputs.",
+            "Study period & load — Peak = IT × PUE; Seasonal TOD shapes demand; LF S1–S4 (headline = S1); "
+            "annual load = Σ hourly MWh.",
+            "Architecture mix (bill) — Selected mix % sum to 100%; Blended = Discom×G% + Solar×S% + Wind×W% + Storage×B%.",
+            "Hourly availability — Solar/Wind shapes scaled to annual mix%×load (solar ~0 at night); "
+            "BESS mix > 0 derives storage for night shifting; DISCOM fills residual when included.",
+            "Cost blend — TARGET_POWER_PCT and SIMULATED_ENERGY_SHARE both price Architecture mix % (bill Target = Simulated).",
+            "Annual bill / ₹/kWh / savings / NPV — Bill = load × blended × 1000; demand = Peak × DISCOM%; "
+            "savings vs 100% DISCOM; NPV at discount rate (Year-0 generation CAPEX = 0).",
+            "Annual RE % — Σ RE serving load / Σ Load (availability).",
+            "24×7 CFE — CFE_t = Min(Load, Solar+Wind+RE-BESS)/Load×100. Pass = every hour ≥ target. "
+            "Night CFE from wind/BESS, not firm solar.",
+            "Carbon — Baseline = load × grid EF; actual = load × DISCOM%/100 × EF; saved = baseline − actual.",
+            "Compliance — Annual RE/CFE = availability; RPO/RCO = Architecture RE mix; ESO = BESS mix × load.",
+            "Workflow — Setup both architectures → Save → Run Analysis → compare → Hourly CFE → Assumptions audit.",
+        ],
+    )
+
+    add_heading(doc, "15.3 Settings — Share & access", 2)
     add_para(
         doc,
         "Settings has two cards:",
@@ -1628,7 +1583,8 @@ def build():
         doc,
         "This chapter documents how PowerTrain Optimizer calculates every major value you see in the UI, "
         "Excel and PDF. Units: power in MW, energy in MWh (1 MWh = 1,000 kWh), money in ₹. "
-        "One model hour = 1 MW sustained for 1 hour → 1 MWh.",
+        "One model hour = 1 MW sustained for 1 hour → 1 MWh. Commercial billing uses tariff stacks — "
+        "not generation-plant CAPEX recovery.",
     )
 
     add_heading(doc, "17A.1 Time horizon", 2)
@@ -1641,10 +1597,11 @@ def build():
         ],
     )
 
-    add_heading(doc, "17A.2 Synthetic load profile", 2)
+    add_heading(doc, "17A.2 Synthetic load profile (DC demand)", 2)
     add_para(
         doc,
-        "When load.profile_source = SYNTHETIC, an 8,760 shape is built from the Load parameters, then scaled:",
+        "When load.profile_source = SYNTHETIC, an 8,760 demand shape is built from the Load parameters, then scaled. "
+        "This shapes data-centre demand only — not Solar/Wind plant CF:",
     )
     add_bullets(
         doc,
@@ -1666,106 +1623,62 @@ def build():
         "invalid files are rejected — no silent fallback).",
     )
 
-    add_heading(doc, "17A.3 Synthetic solar profile", 2)
-    add_bullets(
-        doc,
-        [
-            "Outside [sunrise_hour, sunset_hour] generation = 0.",
-            "Inside daylight: a Gaussian-like diurnal curve peaked at peak_generation_hour, "
-            "× monthly seasonal_1…12 factors, × deterministic noise of amplitude hourly_variability (seeded).",
-            "Scaled so annual energy / (capacity_mw × 8760) ≈ capacity_factor_pct / 100.",
-            "Clipped so solar_t ≤ capacity_mw every hour.",
-            "PROJECT DATA uses the imported MW series instead.",
-        ],
-    )
-
-    add_heading(doc, "17A.4 Synthetic wind profile", 2)
-    add_bullets(
-        doc,
-        [
-            "Monthly month_1…12 factors × mild diurnal shape × deterministic hourly_variability noise.",
-            "Scaled to capacity_factor_pct and clipped to capacity_mw.",
-            "PROJECT DATA uses the imported MW series instead.",
-        ],
-    )
-
-    add_heading(doc, "17A.5 Hourly dispatch (rule-based — default)", 2)
+    add_heading(doc, "17A.3 Solar / Wind / DISCOM — annual contract + hourly shapes", 2)
     add_para(
         doc,
-        "Each hour t the engine follows fixed priorities (also shown as Optimization priority_1…5):",
+        "Architecture mix % sets annual contract energy. Hourly shapes keep TOD/availability:",
     )
     add_para(
         doc,
-        "BESS modelling note: separate Charge efficiency, Discharge efficiency, Max charge power and Max discharge "
-        "power inputs are removed. Charge and discharge are each limited by bess.power_mw. Conversion is ideal "
-        "(η = 100%), so energy into storage equals energy out for a given throughput (aside from SOC window limits). "
-        "Older projects drop the retired fields automatically when opened.",
-    )
-    add_numbered(
-        doc,
-        [
-            "RE serves load first: DirectRE_t = min(Solar_t + Wind_t, Load_t). Solar/wind shares of DirectRE are proportional to their generation.",
-            "Excess RE charges BESS (if capacity and SOC headroom allow), limited by BESS power rating (η = 100%).",
-            "Any RE still left is curtailed.",
-            "If load remains, BESS discharges (limited by power rating and SOC above min; η = 100%).",
-            "Grid import serves any residual, ≤ max_import_mw × (availability_pct/100).",
-            "If still short → Unserved_t > 0.",
-            "Optional: if allow_grid_charge and load is fully met, residual grid headroom may charge BESS.",
-        ],
-    )
-    add_para(doc, "State of charge (MWh):", bold=True)
-    add_para(
-        doc,
-        "SOC_t = SOC_(t−1) + Charge_t − Discharge_t, "
-        "with SOC_min = min_soc_pct/100 × energy_mwh and SOC_max = max_soc_pct/100 × energy_mwh. "
-        "Charge and discharge power are both capped at bess.power_mw. Conversion efficiency is modelled as ideal (100%).",
-    )
-    add_para(doc, "User-editable BESS technical inputs (Setup → BESS):", bold=True)
-    add_table(
-        doc,
-        ["Parameter", "Role"],
-        [
-            ["power_mw", "Power rating — max charge MW and max discharge MW in every hour"],
-            ["energy_mwh", "Energy capacity used with SOC % limits"],
-            ["initial_soc_pct / min_soc_pct / max_soc_pct", "Starting SOC and operating window"],
-            ["calendar_degradation_pct / cycle_degradation_pct", "Multi-year fade (financial / availability framing)"],
-            ["capex / opex / life / replacement_*", "Economics of the battery"],
-            ["allow_grid_charge", "If true, grid may charge BESS after load is met"],
-        ],
-        col_widths=[2.2, 4.3],
-    )
-    add_para(doc, "Removed from BESS (no longer in UI or model inputs):", bold=True)
-    add_bullets(
-        doc,
-        [
-            "charge_efficiency_pct — was one-way charge efficiency; now fixed at 100%.",
-            "discharge_efficiency_pct — was one-way discharge efficiency; now fixed at 100%.",
-            "round_trip_efficiency_pct — was calculated from the two efficiencies; removed.",
-            "max_charge_mw / max_discharge_mw — replaced by power_mw for both directions.",
-        ],
-    )
-    add_para(doc, "Hourly AC power balance (validated):", bold=True)
-    add_para(
-        doc,
-        "Solar_t + Wind_t + Discharge_t + Grid_t + Unserved_t  =  Load_t + Charge_t + Curtailment_t",
+        "Σ Solar_t = Load_annual × Solar%/100;  Σ Wind_t = Load_annual × Wind%/100 "
+        "(shapes from synthetic CF or PROJECT DATA; solar ≈ 0 outside sunrise–sunset)",
         italic=True,
     )
-    add_para(
-        doc,
-        "Optional LP Dispatch mode solves weekly blocks with SciPy HiGHS (minimise grid cost + small curtailment penalty) "
-        "when selected; the default product path is rule-based.",
-    )
-
-    add_heading(doc, "17A.6 Renewable serving load & origin tracking", 2)
     add_bullets(
         doc,
         [
-            "RE_serving_load_t = DirectRE_t + RE_origin_discharge_t  (MW in hour t → MWh for that hour).",
-            "BESS stores separate origin buckets: solar-origin, wind-origin, grid-origin SOC.",
-            "Charge from solar/wind increases the matching RE bucket 1:1 (η = 100%); grid charge increases grid-origin.",
-            "Discharge depletes origin buckets in proportion to their share of stored energy.",
-            "Grid-origin discharge does NOT count toward RE_serving_load / CFE.",
-            "re_origin_stored_share_pct ≈ Σ charge_from_RE / Σ total_charge × 100 (used in ESO checks).",
+            "Night: solar contribution ≈ 0; wind shape can still be non-zero.",
+            "BESS% is billed at Storage tariff; if BESS mix > 0, derived power/energy shifts day RE to night.",
+            "DISCOM included → grid import cap ≈ peak; Captive → grid cap = 0.",
+            "Commercial unserved_mwh = 0 for feasibility; charts show availability series.",
+        ],
+    )
+
+    add_heading(doc, "17A.4 DC load shape (demand)", 2)
+    add_bullets(
+        doc,
+        [
+            "Seasonal TOD and LF S1–S4 shape data-centre demand.",
+            "Solar night = 0 comes from the solar profile (sunrise–sunset), not from load TOD alone.",
+            "Optional PROJECT DATA CSV on Load / Solar / Wind replaces synthetic series when configured.",
+        ],
+    )
+
+    add_heading(doc, "17A.5 Hourly dispatch (availability)", 2)
+    add_para(
+        doc,
+        "Each hour: RE (Solar+Wind) serves load first; excess charges BESS; residual load from BESS discharge "
+        "then DISCOM (if grid cap > 0). Curtailment if RE remains after charge.",
+    )
+    add_para(
+        doc,
+        "Solar_t + Wind_t + Discharge_t + Grid_t + Unserved_t ≈ Load_t + Charge_t + Curtailment_t",
+        italic=True,
+    )
+    add_bullets(
+        doc,
+        [
+            "RE-origin tracking on BESS charge/discharge — only RE-origin discharge counts toward CFE.",
+            "Bill still uses Architecture mix % × tariffs (not dispatch energy shares).",
+        ],
+    )
+
+    add_heading(doc, "17A.6 RE serving load", 2)
+    add_bullets(
+        doc,
+        [
+            "RE_serving_load_t = Direct Solar+Wind to load + RE-origin BESS discharge.",
+            "DISCOM / grid-origin BESS discharge do not count toward RE / CFE.",
         ],
     )
 
@@ -1778,20 +1691,21 @@ def build():
     add_para(
         doc,
         "Pass if Annual RE % ≥ annual_re_target_pct. Gap (pp) = max(0, target − actual). "
-        "This energy-weighted CFE over the year equals Annual RE % in this model.",
+        "Energy-weighted CFE over the year equals Annual RE % when CFE uses the same RE serving series.",
     )
 
     add_heading(doc, "17A.8 Hourly CFE % and pass modes", 2)
     add_para(
         doc,
-        "CFE_t = (RE_serving_load_t / Load_t) × 100   (if Load_t ≈ 0, CFE_t is treated as 100%)",
+        "CFE_t = Min(Load_t, Solar_t + Wind_t + RE_BESS_discharge_t) / Load_t × 100  "
+        "(if Load_t ≈ 0, CFE_t is treated as 100%)",
         italic=True,
     )
     add_table(
         doc,
         ["CFE pass mode", "Pass rule", "Actual used for gap"],
         [
-            ["All hours ≥ target", "Every hour CFE_t ≥ target (hours meeting ≈ 100%)", "Minimum hourly CFE"],
+            ["All hours ≥ target", "Every hour CFE_t ≥ target", "Minimum hourly CFE"],
             ["Mean hourly CFE ≥ target", "Unweighted mean of CFE_t ≥ target", "Mean hourly CFE"],
             ["Share of hours ≥ target", "% of hours with CFE_t ≥ target ≥ cfe_hour_share_target_pct", "% hours meeting"],
         ],
@@ -1800,11 +1714,12 @@ def build():
     add_bullets(
         doc,
         [
-            "min / mean / median / P95 hourly CFE",
+            "min / mean / median / P95 hourly CFE (min often set by night hours)",
             "% hours ≥ target; hours below target",
             "Longest continuous deficit streak (hours)",
             "Max and mean CFE deficit in percentage points (pp) where below target",
-            "Duration curve (CFE sorted high→low vs % of hours)",
+            "Architecture CF % = contracted Solar%+Wind%+BESS% (bill reference — not forced hourly)",
+            "Duration curve and hour-of-day / daily / monthly performance blocks",
         ],
     )
 
@@ -1813,32 +1728,33 @@ def build():
         doc,
         ["KPI", "Calculation"],
         [
-            ["Annual solar / wind MWh", "Σ Solar_t / Σ Wind_t over 8,760 hours"],
-            ["Grid import MWh / GWh", "Σ Grid_t ; GWh = MWh / 1,000"],
-            ["Curtailment %", "Σ Curtail_t / max(Σ Solar_t + Σ Wind_t, ε) × 100"],
-            ["Unserved MWh", "Σ Unserved_t  (must be ≈ 0 for feasibility when enforce_no_unserved)"],
-            ["BESS duration (h)", "energy_mwh / power_mw"],
-            ["BESS cycles", "Σ Discharge_t / energy_mwh"],
-            ["BESS utilization %", "min(100, cycles / 365 × 100) — vs 1 full cycle/day"],
-            ["BESS losses MWh", "0 (ideal conversion; η_c = η_d = 100%)"],
-            ["Max grid import MW", "max(Grid_t) over the year (feeds demand charge)"],
+            ["Annual solar / wind MWh", "Σ Solar_t / Σ Wind_t (shapes scaled to mix% × annual load)"],
+            ["Grid import MWh / GWh", "Σ Grid_t from dispatch; GWh = MWh / 1,000"],
+            ["Annual RE %", "Σ RE serving load / Σ Load × 100 (availability)"],
+            ["Hourly CFE (min)", "Min of hourly availability CFE — Pass if ≥ hourly_cfe_target_pct"],
+            ["Unserved MWh", "0 commercially; dispatch_unserved_mwh kept for diagnostics"],
+            ["BESS (buyer)", "Bill: mix % × Storage tariff; hourly: derived MW/MWh when BESS mix > 0"],
+            ["Max grid import MW", "max(Grid_t); demand charge uses Peak × DISCOM%"],
         ],
     )
 
-    add_heading(doc, "17A.10 Energy Ledger reconciliation", 2)
-    add_para(doc, "Annual (and each month) the ledger checks four identities within a tight MWh tolerance:")
+    add_heading(doc, "17A.10 Internal energy balance (buyer path)", 2)
+    add_para(
+        doc,
+        "Commercial energy identities on the buyer path:",
+    )
     add_bullets(
         doc,
         [
-            "Solar identity: Solar = Solar→Load + Solar→BESS + Solar curtailment",
-            "Wind identity: Wind = Wind→Load + Wind→BESS + Wind curtailment",
-            "Load identity: Load = Direct RE + BESS discharge + Grid→Load + Unserved",
-            "AC balance: Solar + Wind + Discharge + Grid + Unserved  ≈  Load + Charge + Curtailment",
+            "Mix identity (bill): Solar% + Wind% + BESS% + DISCOM% = 100% for selected assets",
+            "Annual contract: Σ Solar / Σ Wind = Load × mix%",
+            "Hourly AC balance: Solar + Wind + Discharge + Grid + Unserved ≈ Load + Charge + Curtailment",
+            "Commercial unserved_mwh = 0; charts may still show charge/discharge/SOC when BESS mix > 0",
         ],
     )
     add_para(
         doc,
-        "If any gap exceeds tolerance → reconciliation Fail / MODEL ERROR — do not use the run for decisions.",
+        "Hard validation failures (NaN / non-finite) → MODEL ERROR — do not use the run for decisions.",
     )
 
     add_heading(doc, "17A.11 Compliance calculations (RPO / RCO / ESO)", 2)
@@ -1850,16 +1766,13 @@ def build():
     add_bullets(
         doc,
         [
-            "RPO: for each bucket (solar/wind/hydro/other), required_mwh = Load_MWh × target_pct/100. "
-            "Gap = max(0, required − actual_generation_bucket). "
-            "If Applicable: cost = Σ gaps_mwh × 1,000 × rpo_buyout_inr_per_kwh.",
-            "RCO: compares Annual RE % to rco_target_pct. "
-            "Gap energy ≈ max(0, Load×target/100 − RE_serving_load). "
-            "Cost uses REC or buyout ₹/kWh when Applicable.",
-            "ESO: required_storage_mwh = Load_MWh × active_year_target_pct/100. "
-            "Actual storage energy = Σ BESS charge. Also requires RE-origin share of stored energy ≥ eso_re_origin_min_pct "
-            "(default 85% from concept note). Buyout on shortfall / origin failure when Applicable.",
-            "total_compliance_cost_inr = RPO cost + RCO cost + ESO cost (year-1 stack).",
+            "RPO/RCO (single integrated target): actual = Architecture RE % (Solar%+Wind%+BESS%). "
+            "Required MWh = Load_MWh × rpo_rco_target_pct/100. Gap = max(0, required − Load×RE%/100). "
+            "Buyout cost when Applicable uses configured ₹/kWh.",
+            "ESO: required_storage_mwh = Load_MWh × eso_target_pct/100. "
+            "Actual = Load_MWh × BESS mix %/100. Contracted BESS treated as 100% RE-origin on the buyer path. "
+            "Buyout on shortfall when Applicable.",
+            "total_compliance_cost_inr = RPO/RCO cost + ESO cost (year-1 stack).",
         ],
     )
 
@@ -1873,61 +1786,55 @@ def build():
         ],
     )
 
-    add_heading(doc, "17A.13 CAPEX and OPEX", 2)
+    add_heading(doc, "17A.13 Generation-plant CAPEX (not used in buyer UI)", 2)
+    add_para(
+        doc,
+        "The commercial data-centre buyer path sets generation CAPEX and OPEX to zero in ₹/kWh and cash-flows. "
+        "Solar, Wind and BESS are priced only through stacked consumer ₹/kWh tariffs (plus optional network lines). "
+        "Legacy plant CAPEX parameters are hidden from the Assumptions register.",
+    )
+
+    add_heading(doc, "17A.14 Bill blend — TARGET_POWER_PCT vs SIMULATED_ENERGY_SHARE", 2)
     add_bullets(
         doc,
         [
-            "Solar CAPEX = capacity_mw × capex_inr_per_mw",
-            "Wind CAPEX = capacity_mw × capex_inr_per_mw",
-            "BESS CAPEX = power_mw × capex_inr_per_mw + energy_mwh × capex_inr_per_mwh",
-            "Total CAPEX = solar + wind + BESS (forced to 0 for DISCOM structure / when include_generation_capex = False as configured)",
-            "Solar OPEX = capacity_mw × opex_inr_per_mw_year (0 under DISCOM)",
-            "Wind OPEX = capacity_mw × opex_inr_per_mw_year",
-            "BESS OPEX = opex_inr_per_year",
+            "TARGET_POWER_PCT: Grid/Solar/Wind/BESS shares = Architecture mix_*_pct for selected assets.",
+            "SIMULATED_ENERGY_SHARE: same as Target on the buyer path — Architecture contracted mix % "
+            "(no plant MW inventing; Target = Simulated).",
+            "Blended ₹/kWh = Discom×G% + Solar×S% + Wind×W% + Storage×B% (DISCOM/Solar/Wind rates from stacked lines).",
+            "BESS on Captive/Hybrid: Storage rate = excel_bess_ppa_inr_per_kwh only.",
+            "Demand charge = Peak_MW × DISCOM%/100 × demand ₹/MW-month × 12.",
         ],
     )
 
-    add_heading(doc, "17A.14 Capital recovery factor (annualised CAPEX)", 2)
-    add_para(
-        doc,
-        "CRF(r, n) = r(1+r)^n / ((1+r)^n − 1)   with r = discount_rate_pct/100, n = asset project_life_yr. "
-        "If r ≈ 0, CRF = 1/n.",
-        italic=True,
-    )
-    add_para(
-        doc,
-        "Annualised CAPEX_asset = CAPEX_asset × CRF(r, n_asset). "
-        "Used in Year-1 TOTAL COST OF DELIVERED ENERGY when generation CAPEX is included. "
-        "DISCOM forces annualised generation CAPEX to 0.",
-    )
-
     add_heading(doc, "17A.15 Commercial energy & network charges (Year 1)", 2)
+    add_para(
+        doc,
+        "Load stack (Excel parity, all structures’ synthetic load): Total facility MW = IT Load × PUE; "
+        "Actual average MW = Total × (load_factor_pct/100); annual energy MWh from the 8,760 profile "
+        "(≈ Actual × 8,760 when the shape meets the load-factor target).",
+    )
     add_bullets(
         doc,
         [
-            "Demand charge = max_grid_import_mw × demand_charge_inr_per_mw_month × 12",
-            "Fixed charge = fixed_charge_inr_per_year",
-            "Additional costs = sum of Financial → additional_costs annual ₹ rows (inflated in multi-year cashflows)",
-            "DISCOM: RE energy cost = 0 (grid-only).",
-            "CAPTIVE: RE energy cost = (RE_serving_load_mwh / (1 − loss_pct/100)) × 1,000 × captive_energy_price",
-            "OPEN_ACCESS: same form with oa_energy_price",
-            "HYBRID with include_generation_capex = False: "
-            "RE energy cost = Solar_mwh×1,000×solar_energy_cost + Wind_mwh×1,000×wind_energy_cost",
-            "HYBRID with include_generation_capex = True: RE tariff energy cost typically 0; CAPEX recovered via CRF",
-            "Network charges are per asset when that asset is included and its apply_network_charges_to_* flag is True:",
-            "  — Solar MWh × 1,000 × (solar transmission + wheeling + banking_if_enabled + other)",
-            "  — Wind MWh × 1,000 × (wind transmission + wheeling + banking_if_enabled + other)",
-            "  — BESS discharge MWh × 1,000 × (bess transmission + wheeling + other)",
-            "  — Grid import MWh × 1,000 × (grid/DISCOM transmission + wheeling + other) when apply_network_charges_to_grid",
-            "Legacy apply_network_charges_to_re / re_* rates are migrated into the per-asset fields when opening older projects.",
+            "DISCOM / Captive / Hybrid Year-1 bill (tariff-stack path):",
+            "  — Discom ₹/kWh = stacked DISCOM energy + wheeling + TOD + ED + TOSE",
+            "  — Solar / Wind ₹/kWh = stacked PPA + energy + wheeling + transmission + losses + CSS + AS + SLDC + banking + ED + TOSE",
+            "  — Storage ₹/kWh = excel_bess_ppa_inr_per_kwh (Captive/Hybrid only)",
+            "  — Blended rate from Architecture % or simulated shares (17A.14)",
+            "  — Annual bill ₹ = energy + demand + fixed + compliance + additional costs",
+            "Demand charge ≈ billing MW × demand_charge_inr_per_mw_month × 12 (billing MW from peak×DISCOM% or max grid import when simulated)",
+            "Fixed charge = fixed_charge_inr_per_year (+ meter/LD as configured)",
+            "Optional per-asset network ₹/kWh when apply_network_charges_to_* flags are enabled",
+            "Carbon: baseline tCO₂ = load×EF; actual = load×DISCOM%/100×EF; saved = baseline−actual. "
+            "CFE / Annual RE = Solar%+Wind%+BESS% (firm)",
         ],
     )
 
     add_heading(doc, "17A.16 TOTAL COST OF DELIVERED ENERGY (₹/kWh)", 2)
     add_para(
         doc,
-        "Year-1 total annual cost = Grid energy + Demand + Fixed + RE energy + Network + OPEX + "
-        "Annualised CAPEX + Compliance + Additional costs",
+        "Year-1 total annual cost = Stacked energy bill + Demand + Fixed + Network (if any) + Compliance + Additional costs",
         italic=True,
     )
     add_para(
@@ -1941,17 +1848,15 @@ def build():
         "matches these annualisation assumptions.",
     )
 
-    add_heading(doc, "17A.17 Multi-year cash-flows, NPV, IRR, payback", 2)
-    add_para(doc, "Absolute project cash-flows (cost framing):", bold=True)
+    add_heading(doc, "17A.17 Multi-year cash-flows & NPV of power bill", 2)
+    add_para(doc, "Buyer cash-flows (cost framing — no plant CAPEX at Year 0):", bold=True)
     add_bullets(
         doc,
         [
-            "Year 0: CF_0 = −CAPEX_0 (0 if CAPEX not included / DISCOM)",
-            "Year y = 1…N: escalate grid energy by electricity_escalation_pct; "
-            "demand/fixed/OPEX/compliance by inflation_pct; RE/network parts by re_cost_escalation_pct",
-            "In bess.replacement_year: add replacement_cost_pct/100 × BESS CAPEX (if CAPEX included)",
-            "Final year: residual credit = −CAPEX_0 × residual_value_pct/100 (negative cost = inflow)",
-            "CF_y = −(operating cost_y) − residual_adjustment",
+            "Year 0: CF_0 = 0 (no generation-plant investment in commercial buyer mode)",
+            "Year y = 1…N: escalate grid portion by electricity_escalation_pct; "
+            "demand/fixed/compliance by inflation_pct; RE/storage portions by re_cost_escalation_pct",
+            "CF_y = −(annual power bill_y) including additional costs and compliance",
         ],
     )
     add_para(
@@ -1970,62 +1875,46 @@ def build():
     )
     add_para(doc, "npv_cr = npv_inr / 1e7  (₹ Crore display helper).", italic=True)
 
-    add_heading(doc, "17A.18 Incremental economics vs DISCOM (GRID-ONLY BASELINE)", 2)
+    add_heading(doc, "17A.18 Savings vs DISCOM & NPV of savings", 2)
     add_para(
         doc,
-        "The model always runs a parallel DISCOM case with solar = wind = BESS = 0 (grid-only). "
-        "For CAPTIVE / HYBRID / OPEN_ACCESS:",
+        "Each Run Analysis includes a parallel DISCOM GRID-ONLY BASELINE (same load, LF scenario, grid tariffs). "
+        "For Captive and Hybrid:",
     )
     add_bullets(
         doc,
         [
-            "Incremental CAPEX = Project_CAPEX − DISCOM_CAPEX (usually = Project_CAPEX)",
-            "Year-y savings = DISCOM_annual_cost_y − Project_annual_cost_y",
-            "Incremental cash-flows: CF_0 = −Incremental CAPEX; CF_y = savings_y",
-            "Incremental NPV = Σ_t CF_t / (1 + r)^t with r = financial.discount_rate_pct / 100 "
-            "(same discount rate as Project Setup → Financial; used by both simulation and optimization)",
-            "IRR and payback are computed on the same incremental cash-flow series",
-            "Dashboard NPV / IRR / Payback for non-DISCOM structures are these incremental metrics "
-            "(economics_basis = incremental_vs_discom)",
-            "DISCOM itself remains the GRID-ONLY BASELINE comparator and is never auto-labelled RECOMMENDED for RE/CFE targets",
+            "Year-y savings_inr = DISCOM_annual_bill_y − architecture_annual_bill_y",
+            "Savings cash-flows: CF_0 = 0; CF_y = savings_y (no Δ plant CAPEX)",
+            "NPV of savings = Σ_t CF_t / (1 + r)^t with r = financial.discount_rate_pct / 100",
+            "Dashboard/Economics NPV ₹ Cr for Captive/Hybrid reflects this savings series unless noted otherwise",
+            "DISCOM column shows reference bill only — not a selectable architecture",
         ],
     )
 
-    add_heading(doc, "17A.19 Feasibility → RECOMMENDED", 2)
+    add_heading(doc, "17A.19 Feasibility (informational)", 2)
     add_bullets(
         doc,
         [
-            "FEASIBLE only if enabled technical checks pass (RE target if enforce_re_target, CFE pass mode if enforce_cfe_target, "
-            "unserved ≈ 0 if enforce_no_unserved) and no MODEL ERROR.",
-            "INCOMPLETE INPUTS if editable DEFAULT_ASSUMPTION values remain.",
-            "LEGAL REVIEW REQUIRED if RPO/RCO/ESO still need legal review.",
-            "can_recommend = true only when status = FEASIBLE. Architectures are never labelled RECOMMENDED otherwise.",
+            "FEASIBLE when enabled RE/CFE (and Applicable RPO/ESO) checks pass and there is no MODEL ERROR.",
+            "INCOMPLETE INPUTS when editable DEFAULT_ASSUMPTION values remain.",
+            "LEGAL REVIEW REQUIRED when RPO/RCO/ESO applicability needs legal input.",
+            "Feasibility does not auto-select Captive vs Hybrid and does not show RECOMMENDED tags.",
         ],
     )
 
-    add_heading(doc, "17A.20 Optimization ranking (summary)", 2)
-    add_numbered(
-        doc,
-        [
-            "Build capacity candidates (Quick / Standard / Thorough grids of solar, wind, BESS, grid).",
-            "For each candidate: full 8,760 dispatch → KPIs → compliance → feasibility → financials (incl. incremental vs DISCOM).",
-            "Discard / flag infeasible per enforce_* flags.",
-            "Rank by objective (Minimum Cost, Maximum RE, Maximum CFE, Minimum Grid Dependency, Compliance First, or Balanced weighted score).",
-            "Local neighbourhood refine; return top feasible solutions + explainability (why this / why not nearby).",
-        ],
-    )
+    add_heading(doc, "17A.20 Load-factor scenarios", 2)
     add_para(
         doc,
-        "Balanced objective uses weight_cost, weight_re, weight_cfe, weight_grid (normalised) to combine "
-        "lower cost, higher RE, higher CFE and lower grid energy.",
+        "load_factor_s1_pct … s4_pct define up to four scenarios. Each Run Analysis loops scenarios, "
+        "but headline Dashboard KPIs and the comparison table use S1. Exports include all scenario summaries.",
     )
 
     add_heading(doc, "17A.21 Config fingerprint", 2)
     add_para(
         doc,
-        "Each run stores a SHA-256 hash of the normalised project configuration (config fingerprint) "
-        "shown on the Energy Ledger for audit. Changing inputs increments input_version; mismatched "
-        "versions mark results STALE until you re-run the simulation.",
+        "Each run stores a SHA-256 hash of the normalised project configuration (Reports / audit). "
+        "Changing inputs increments input_version; mismatched versions mark results STALE until you re-run analysis.",
     )
 
     add_heading(doc, "17A.22 Display formatting (not a model change)", 2)
@@ -2039,68 +1928,51 @@ def build():
     doc.add_page_break()
 
     # 18 Workflow
-    add_heading(doc, "18. Recommended End-to-End Workflow (Model 2.0)", 1)
+    add_heading(doc, "16. End-to-End Workflow (Commercial Buyer)", 1)
     add_numbered(
         doc,
         [
-            "Launch EXE (Chrome opens Start) or open Network URL if using a shared host → Create New Project "
+            "Launch EXE (Chrome opens Start) or open Network URL on a shared host → Create New Project "
             "(or Open Existing Project… .pto.zip).",
-            "Optional: open Settings → note Network URL if colleagues will join from other laptops.",
-            "Optional: Save Project to store a .pto.zip in a local folder.",
-            "Project Setup: select Architecture structure + assets + Asset usage % (selected % must sum to 100); "
-            "replace peak load, tariffs, CAPEX/OPEX, "
-            "Compliance applicability/targets and Financial (incl. Additional costs) with project data. "
-            "Read the short help text under each parameter.",
-            "Optional: Profiles → upload Load/Solar/Wind PROJECT DATA CSVs; confirm badges.",
-            "Review Assumptions register — clear remaining critical defaults (Data Quality card will update after re-sim).",
-            "Run 8760 Simulation → read Feasibility / Data Quality / CFE Pass Mode before KPI storytelling "
-            "(numbers show as Lakh / Cr when large).",
-            "Open Energy Ledger → confirm reconciliation OK and note config hash.",
-            "If status is NOT FEASIBLE, use binding constraints / remedies before optimizing "
-            "(adjust Compliance in Project Setup if targets/pass mode need changing).",
-            "Open 8760 Simulation page → pick Time window (month/week/day) → Show charts for critical periods.",
-            "Architecture → Run Architecture Comparison → note RECOMMENDED only if a feasible architecture exists.",
-            "Optimization → set RE/CFE constraints → Run Optimization → read explainability + optional marginal steps.",
-            "Apply a preferred candidate capacity set into inputs (manually) → re-simulate (clear STALE).",
-            "Economics → review GRID-ONLY BASELINE and Incremental vs DISCOM.",
-            "Scenarios → save named cases for board packs.",
-            "Sensitivity → understand ₹/kWh drivers.",
-            "Reports → Export Excel and PDF; Backup Project (.pto.zip) or top-bar Save Project.",
-            "Independent legal/commercial review of RPO/RCO/ESO applicability before decisions.",
-            "When finished: Quit App (or close the Chrome tab) so the host EXE exits and network users disconnect.",
+            "Optional: Settings → note Network URL for LAN colleagues; Save Project for a local .pto.zip backup.",
+            "Project Setup: configure Captive and Hybrid (assets, mix % sum 100%, tariff stacks, Storage ₹/kWh), "
+            "Load (S1–S4 LF scenarios), Grid/DISCOM tariffs, Compliance (RPO/RCO/ESO single targets, hourly CFE), "
+            "Financial (discount rate, escalations, Additional costs).",
+            "Optional: upload PROJECT DATA CSVs on Load/Solar/Wind steps; confirm Data Quality badges.",
+            "Review Assumptions register for remaining buyer-facing defaults.",
+            "Run 8760 Simulation → Dashboard: compare Captive vs Hybrid + DISCOM baseline (S1 KPIs).",
+            "If NOT FEASIBLE, read binding constraints; adjust Compliance or contracts in Project Setup.",
+            "Hourly CFE → TOD availability charts (night solar ~0); Economics → Target = Simulated bill mix.",
+            "Reports → Export Excel/PDF; Save Project / Backup .pto.zip for colleagues.",
+            "Independent legal review of RPO/RCO/ESO applicability before decisions.",
+            "Quit App (or close Chrome tab) when finished so the host EXE exits.",
         ],
     )
 
     # 19 Interpreting results
-    add_heading(doc, "19. Interpreting Results Correctly", 1)
+    add_heading(doc, "17. Interpreting Results Correctly", 1)
     add_bullets(
         doc,
         [
-            "Never present an architecture as RECOMMENDED if Feasibility ≠ FEASIBLE.",
-            "Unserved energy > 0 means load was not fully met under the configured grid/BESS/RE limits — treat as NOT FEASIBLE for reliability.",
-            "High curtailment means RE was oversized relative to load + BESS absorption.",
-            "High Annual RE with low min Hourly CFE means energy is green on average but not 24×7 — needs more BESS and/or wind for night coverage.",
+            "Compare Captive vs Hybrid directly on the Dashboard — the app does not pick a RECOMMENDED winner.",
+            "Unserved energy > 0 means load was not fully met — treat as NOT FEASIBLE for reliability.",
+            "High Annual RE with low min Hourly CFE means energy is green on average but not 24×7.",
             "Read CFE Pass Mode carefully — All hours ≥ target is much stricter than Mean or Share-of-hours.",
-            "DISCOM ₹/kWh is the GRID-ONLY BASELINE for incremental NPV/IRR — not a green architecture.",
-            "DISCOM rows with 0% RE/CFE and “—” IRR/Payback are expected (grid-only, no investment recovery).",
-            "Pass/Fail on compliance depends on your applicability declaration and targets — Unknown is not Pass.",
-            "INCOMPLETE INPUTS means defaults remain — suitable for screening, not investment decisions.",
-            "STALE RESULTS means inputs changed after the run — re-simulate before exporting.",
-            "Energy Ledger Fail / MODEL ERROR → do not use the run; report hour/context if it persists on a released build.",
-            "Never present DEFAULT ASSUMPTION results as site-measured facts.",
-            "SYNTHETIC profiles are model-generated from Setup parameters — useful for screening; "
-            "upload PROJECT DATA CSVs when you need site-specific hourly shapes.",
-            "Defaults left is a count of unset defaults, not an error. Clear critical defaults before board packs.",
-            "Asset usage % for selected assets must sum to 100% — otherwise save/simulation is blocked.",
-            "₹/kWh is TOTAL COST OF DELIVERED ENERGY in this model — not a formal certified LCOE.",
-            "Large on-screen values in Lakh / Cr (and chart ticks in k / Lakh / Cr) are display formatting — "
-            "check Excel exports for full-precision cells if needed.",
-            "When sharing over LAN, remember everyone edits the same host database — coordinate who saves inputs.",
+            "DISCOM ₹/kWh is the GRID-ONLY BASELINE for savings and NPV — not a selectable green architecture.",
+            "NPV ₹ Cr is NPV of bill savings vs DISCOM, not recovery of solar/wind plant CAPEX.",
+            "Pass/Fail on compliance depends on applicability and single RPO/RCO/ESO targets — Unknown is not Pass.",
+            "INCOMPLETE INPUTS means defaults remain — suitable for screening, not board packs.",
+            "STALE RESULTS means inputs changed after the run — re-run before exporting.",
+            "MODEL ERROR → do not use the run.",
+            "SYNTHETIC profiles are generated from Setup parameters; use PROJECT DATA for site-specific shapes.",
+            "Architecture mix % must sum to 100% per profile before save/simulation.",
+            "Headline KPIs use LF scenario S1 unless you inspect other scenarios in exports.",
+            "When sharing over LAN, everyone edits the same host database — coordinate saves.",
         ],
     )
 
     # 20 Data
-    add_heading(doc, "20. Data Storage, Backup & Persistence", 1)
+    add_heading(doc, "18. Data Storage, Backup & Persistence", 1)
     add_bullets(
         doc,
         [
@@ -2109,7 +1981,7 @@ def build():
             "Projects, inputs, scenarios, settings and run metadata persist across restarts.",
             "Save Project / Backup Project write a portable .pto.zip you can store anywhere and later restore via Open Existing Project….",
             "Hourly arrays for saved runs are stored efficiently (e.g. under data/runs as NPZ), not as 8,760 SQL rows.",
-            "Energy ledger JSON is stored beside the run (sim_<id>_ledger.json).",
+            "Internal energy-balance JSON may be stored beside the run for audit exports (no Ledger UI page).",
             "Imported PROJECT DATA profiles are stored under data/profiles/project_<id>/.",
             "Before schema migrations the app backs up the database automatically.",
             "To distribute the app itself (not project data), copy dist\\PowerTrain_Share\\ or the standalone EXE.",
@@ -2117,7 +1989,7 @@ def build():
     )
 
     # 21 Troubleshooting
-    add_heading(doc, "21. Troubleshooting", 1)
+    add_heading(doc, "19. Troubleshooting", 1)
     add_table(
         doc,
         ["Symptom", "What to do"],
@@ -2132,19 +2004,17 @@ def build():
             ["Unhandled exception … isatty / Unable to configure formatter", "You are on an old windowed EXE. Use the rebuild that redirects stdout/stderr and uses a safe uvicorn log config."],
             ["Slow first open", "Normal on cold start (unpack + DB create). Later launches reuse the DB and should be faster."],
             ["Annual RE / Hourly CFE show Fail on demo", "Expected under default 90% targets with strict All-hours CFE mode. Raise BESS/wind, lower targets, or change CFE pass mode in Project Setup → Compliance."],
-            ["Dashboard says NOT FEASIBLE but costs look fine", "Feasibility is target-driven. Read binding constraints; do not treat as RECOMMENDED."],
+            ["Dashboard says NOT FEASIBLE but costs look fine", "Feasibility is target-driven. Read binding constraints; compare Captive vs Hybrid on merit."],
             ["Where is the Compliance menu?", "Under Project Setup → Compliance (removed from Analysis nav). Dashboard has a shortcut link."],
             ["DISCOM shows 0% RE/CFE and — for IRR/Payback", "Expected: DISCOM is GRID-ONLY BASELINE (no RE assets). IRR/Payback apply to investment cases vs DISCOM."],
             ["STALE RESULTS banner", "Inputs changed after the last run — click Run 8760 Simulation again."],
-            ["MODEL ERROR: PROJECT DATA … no profile", "Upload the CSV under Profiles or set profile_source back to SYNTHETIC."],
+            ["MODEL ERROR: PROJECT DATA … no profile", "Upload CSV on Project Setup Load/Solar/Wind or set profile_source back to SYNTHETIC."],
             ["CSV upload rejected", "Check length (8760/8784), no negatives/NaNs, fix duplicate timestamps; there is no silent fallback."],
-            ["Energy Ledger empty", "Re-run simulation on Model 2.0 so ledger JSON is written."],
             ["MODEL ERROR: power balance", "Report the hour index; indicates an internal dispatch inconsistency (should not occur on released builds)."],
-            ["NO FEASIBLE SOLUTION (optimization)", "Relax RE/CFE targets, raise solar/wind/BESS/grid bounds, or switch search to Thorough; read primary binding constraint."],
-            ["Optimization is slow", "Use Quick search mode first; Standard/Thorough evaluate many full 8,760 runs."],
+            ["Run Analysis feels slow", "Four LF scenarios × Captive/Hybrid × DISCOM baseline — normal for full-year dispatch; wait for completion."],
             ["Dashboard empty", "Click Run 8760 Simulation."],
-            ["Charts empty on 8760 page", "Run simulation first, then choose Time window and click Show charts."],
-            ["Asset usage % must sum to 100% / cannot Save", "On Architecture, adjust DISCOM/Solar/Wind/BESS usage so the live Total equals 100%. Uncheck unused assets (they are excluded from the sum). Switching structure or toggling assets redistributes evenly."],
+            ["Charts empty on Hourly CFE page", "Run simulation first, then choose Time window and click Show charts."],
+            ["Percentage of power must sum to 100% / cannot Save", "In Project Setup Captive or Hybrid section, adjust mix % so Total = 100%. Uncheck unused assets."],
             ["Chart Y-axis shows “housand” or overlaps Energy (MWh)", "Hard-refresh Ctrl+F5 or relaunch latest EXE — axes now use k/Lakh/Cr with wider left margin."],
             ["Numbers look like long digit strings", "Hard-refresh Ctrl+F5 or relaunch latest EXE — UI should show Lakh / Cr for large values."],
             ["What does SYNTHETIC / Defaults left mean?", "SYNTHETIC = generated 8,760 profile (not uploaded CSV). Defaults left = count of parameters still on built-in defaults. See Section 10."],
@@ -2157,7 +2027,7 @@ def build():
     )
 
     # 22 Glossary
-    add_heading(doc, "22. Glossary", 1)
+    add_heading(doc, "20. Glossary", 1)
     add_table(
         doc,
         ["Term", "Definition in this tool"],
@@ -2167,42 +2037,43 @@ def build():
             ["Hourly CFE %", "Hourly carbon-free energy share of load"],
             ["CFE pass mode", "Rule used to Pass/Fail hourly CFE (all hours / mean / share of hours)"],
             ["CFE analytics", "Deficit streak, % hours ≥ target, duration-curve stats attached to KPIs"],
-            ["BESS", "Battery Energy Storage System — power_mw caps charge & discharge; ideal 100% conversion"],
+            ["BESS", "Battery Energy Storage System — power_mw caps charge & discharge; η_c / η_d from charge/discharge efficiency"],
             ["SOC", "State of charge (MWh or %)"],
             ["Curtailment", "Renewable energy that could not serve load or charge BESS"],
-            ["Energy Ledger", "Audited annual/monthly energy flow table with reconciliation"],
             ["Config hash", "SHA-256 fingerprint of configuration used for a run"],
-            ["Feasibility", "Unified status deciding whether RECOMMENDED is allowed"],
+            ["Feasibility", "Pass/Fail for RE/CFE (and Applicable RPO/ESO) — does not pick Captive vs Hybrid"],
             ["Binding constraint", "Primary reason a case fails feasibility (e.g. HOURLY_CFE)"],
             ["STALE", "Results older than current project input_version"],
             ["SYNTHETIC", "8,760-hour Load/Solar/Wind series generated from Setup parameters (not an uploaded CSV)"],
-            ["PROJECT DATA", "Imported validated hourly MW CSV (8,760 or 8,784 hours) under Profiles"],
+            ["PROJECT DATA", "Imported validated hourly MW CSV (8,760 or 8,784 hours) on Project Setup steps"],
             ["Defaults left", "Count of editable parameters still marked DEFAULT_ASSUMPTION on the Data Quality card"],
             ["PRELIMINARY", "Data-quality badge when profiles are not all PROJECT DATA and/or defaults remain"],
             ["DISCOM", "GRID-ONLY BASELINE commercial structure (solar/wind/BESS forced to 0)"],
             ["Captive", "Captive / group captive commercial structure (Solar / Wind / BESS selectable)"],
-            ["Hybrid", "On-site/contracted Solar+Wind+BESS with DISCOM/grid balancing"],
-            ["Open Access", "OA wheeling of RE to the consumer (same asset picker pattern as Hybrid)"],
+            ["Hybrid", "DISCOM backup + contracted Solar/Wind/BESS Storage — analysed equally with Captive"],
+            ["Storage tariff", "Single BESS ₹/kWh (excel_bess_ppa_inr_per_kwh) on Captive/Hybrid buyer path"],
+            ["Load-factor scenario", "S1–S4 LF %; headline KPIs use S1"],
             ["RPO", "Renewable Purchase Obligation"],
             ["RCO", "Renewable Consumption Obligation (applicability may need legal review)"],
             ["ESO", "Energy Storage Obligation"],
-            ["NPV / IRR / Payback", "Project finance metrics; for non-DISCOM use incremental vs DISCOM cashflows at discount_rate_pct"],
-            ["TOTAL COST OF DELIVERED ENERGY", "₹/kWh = annualised cost / load energy in this model"],
-            ["Incremental vs DISCOM", "ΔCAPEX and annual bill savings vs GRID-ONLY BASELINE; NPV uses project discount rate"],
+            ["NPV of savings", "Present value of annual bill savings vs DISCOM at discount_rate_pct (no plant CAPEX at Year 0)"],
+            ["TOTAL COST OF DELIVERED ENERGY", "₹/kWh = Year-1 power bill / load energy (tariff stacks)"],
+            ["Savings vs DISCOM", "Year-1 DISCOM baseline bill minus Captive/Hybrid bill (₹ Cr)"],
+            ["cost_blend_basis", "TARGET_POWER_PCT or SIMULATED_ENERGY_SHARE — both = Architecture contracted mix %"],
             ["Quit App", "Sidebar control that stops the server and background PowerTrain processes (disconnects LAN users)"],
             ["Save Project", "Top-bar action that saves inputs and writes a portable .pto.zip to a folder you choose"],
             [".pto.zip", "Portable project backup/restore archive (Open Existing Project… / Backup Project)"],
             ["Asset selection", "include_discom / include_solar / include_wind / include_bess flags that gate Setup tabs and capacities"],
             [
-                "Asset usage % / mix %",
-                "mix_discom_pct / mix_solar_pct / mix_wind_pct / mix_bess_pct — scale configured capacity; "
+                "Percentage of power / mix %",
+                "mix_discom_pct / mix_solar_pct / mix_wind_pct / mix_bess_pct — Architecture contract shares; "
                 "selected assets must sum to 100%",
             ],
             ["Additional costs", "Named annual ₹ line items under Financial included in delivered-energy cost"],
             ["LAN / Network URL", "http://<host-LAN-IP>:<port>/ so other PCs on the same network can use the host’s running app"],
             ["ACCESS_URLS.txt", "File written on launch with This PC and Network URLs"],
             ["Lakh / Cr / k display", "Compact UI format: full digits under 1 Lakh; Lakh; Cr; chart axes use k / Lakh / Cr"],
-            ["Time window", "8760 Simulation control: Full year / One month / One week / One day"],
+            ["Time window", "Hourly CFE control: Full year / One month / One week / One day"],
             ["Parameter help", "Short explanation shown under each editable field title in the UI"],
             ["PTO_HOST", "Optional env var; 0.0.0.0 = LAN share (default), 127.0.0.1 = this PC only"],
             ["PTO_BROWSER", "Optional env var; chrome (default) | edge | default — which browser the launcher opens"],
@@ -2220,19 +2091,14 @@ def build():
     add_bullets(
         doc,
         [
-            "Create New / Open Existing (.pto.zip) / Save Project workflow",
-            "Architecture asset selection by structure (DISCOM / CAPTIVE / HYBRID / OPEN_ACCESS)",
-            "Asset usage % (mix shares): selected assets must sum to 100%; live UI total; "
-            "equalize on structure/asset change; engine capacity scaling formulas and worked examples",
-            "Data Quality in detail: SYNTHETIC vs PROJECT DATA, PRELIMINARY, Defaults left, critical defaults",
-            "Per-asset network charges and Financial Additional costs",
-            "Compliance only under Project Setup (not Analysis nav)",
-            "Simplified BESS (power_mw caps charge & discharge; ideal 100% efficiency)",
-            "Incremental vs DISCOM NPV using financial.discount_rate_pct (simulation + optimization)",
-            "Compact number display: Lakh / Cr on KPIs; k / Lakh / Cr on chart axes with non-overlapping titles",
-            "Chrome-tab launch, Quit App / tab-close shutdown, single-instance reuse, LAN sharing",
-            "On-screen parameter help and 8760 Time window controls",
-            "Section 17A detailed calculations (profiles, dispatch, RE/CFE, costs, NPV/IRR, ledger, optimization)",
+            "Commercial DC buyer: tariff-stack bills, no generation-plant CAPEX in UI or NPV",
+            "Captive + Hybrid equal analysis; DISCOM baseline only; no RECOMMENDED tags",
+            "Navigation: Dashboard, Project Setup, Economics, Hourly CFE, Reports, Assumptions, Methodology, Settings",
+            "Mix %, cost_blend_basis, Storage tariff, four LF scenarios (S1 headline KPIs)",
+            "Compliance under Project Setup (RPO/RCO/ESO single targets, hourly CFE)",
+            "Assumptions register hides plant-leftover parameters",
+            "NPV of savings vs DISCOM; Section 17A formulas updated",
+            "Create/Open/Save .pto.zip; portable EXE and LAN sharing",
         ],
     )
     add_para(
@@ -2247,6 +2113,13 @@ def build():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     doc.save(OUT)
     print(f"Wrote {OUT}")
+    dist_dir = ROOT / "dist"
+    if dist_dir.is_dir():
+        import shutil
+
+        dist_doc = dist_dir / OUT.name
+        shutil.copy2(OUT, dist_doc)
+        print(f"Copied to {dist_doc}")
 
 
 if __name__ == "__main__":

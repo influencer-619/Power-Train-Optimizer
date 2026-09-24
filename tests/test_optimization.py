@@ -6,7 +6,6 @@ def test_optimization_returns_structure():
     cfg = recompute_calculated(get_default_config())
     set_param(cfg, "optimization.search_mode", "Quick", as_user=True)
     set_param(cfg, "optimization.enforce_re_target", False, as_user=True)
-    set_param(cfg, "optimization.enforce_cfe_target", False, as_user=True)
     set_param(cfg, "commercial.structure", "HYBRID", as_user=True)
     result = run_optimization(cfg)
     assert result["status"] in ("completed", "no_feasible", "cancelled")
